@@ -2,8 +2,8 @@ import json
 import time
 import re
 from urllib.parse import urljoin
-import os
 from pathlib import Path
+import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -12,6 +12,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from bs4 import BeautifulSoup
 from loguru import logger
+import duckdb
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import queue
 
 # --- Loguru Configuration ---
 logger.remove()
@@ -19,278 +22,267 @@ log_path = Path("logs") / "scraper_{time:YYYY-MM-DD}.log"
 logger.add(log_path, rotation="1 day", retention="7 days", level="DEBUG", format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}")
 logger.add(lambda msg: print(msg, end=""), colorize=True, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>", level="INFO")
 
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'
+]
 
 def normalize_key(key_text):
-    """Normalizes a string to be used as a JSON key."""
     return key_text.strip().lower().replace(' ', '_').replace('ä', 'a').replace('ö', 'o')
 
-class OikotieScraper:
-    def __init__(self, headless=True):
-        self.driver = None
-        self.headless = headless
-        self.setup_driver()
+class DatabaseManager:
+    # This class is robust and does not need changes.
+    def __init__(self, db_path="output/real_estate.duckdb"):
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Database will be stored at: {self.db_path}")
+        self.create_table()
 
-    def setup_driver(self):
-        """Initializes the Chrome WebDriver."""
-        logger.debug("Setting up Chrome WebDriver.")
+    def create_table(self):
+        try:
+            with duckdb.connect(str(self.db_path)) as con:
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS listings (
+                        url VARCHAR PRIMARY KEY, source VARCHAR, city VARCHAR, title VARCHAR,
+                        address VARCHAR, listing_type VARCHAR, price_eur FLOAT, size_m2 FLOAT,
+                        rooms INTEGER, year_built INTEGER, overview VARCHAR, full_description VARCHAR,
+                        other_details_json VARCHAR, scraped_at TIMESTAMP
+                    );
+                """)
+            logger.success("Database table 'listings' is ready.")
+        except Exception as e:
+            logger.critical(f"Failed to create database table: {e}")
+            raise
+
+    def _clean_and_convert(self, value_str, target_type):
+        if not value_str: return None
+        try:
+            cleaned_str = value_str.split(' ')[0].replace('\u00a0', '').replace(',', '.').strip()
+            return float(cleaned_str) if target_type == 'float' else int(float(cleaned_str))
+        except (ValueError, TypeError): return None
+
+    def save_listings(self, listings, city_name):
+        if not listings:
+            logger.warning("No listings provided to save.")
+            return
+        insert_count = 0
+        try:
+            with duckdb.connect(str(self.db_path)) as con:
+                for listing in listings:
+                    details = listing.get('details', {})
+                    if not details or 'error' in details: continue
+                    
+                    core_data = {
+                        'price_eur': self._clean_and_convert(details.get('velaton_hinta') or details.get('myyntihinta'), 'float'),
+                        'size_m2': self._clean_and_convert(details.get('asuinpinta-ala'), 'float'),
+                        'rooms': self._clean_and_convert(details.get('huoneita'), 'int'),
+                        'year_built': self._clean_and_convert(details.get('rakennusvuosi'), 'int'),
+                    }
+                    core_keys = ['sijainti', 'rakennuksen_tyyppi', 'velaton_hinta', 'myyntihinta', 'asuinpinta-ala', 'huoneita', 'rakennusvuosi']
+                    other_details = {k: v for k, v in details.items() if k not in core_keys}
+
+                    con.execute(
+                        "INSERT OR REPLACE INTO listings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            listing.get('url'), listing.get('source'), city_name, listing.get('title'),
+                            details.get('sijainti'), details.get('rakennuksen_tyyppi'),
+                            core_data['price_eur'], core_data['size_m2'], core_data['rooms'], core_data['year_built'],
+                            listing.get('overview'), listing.get('full_description'),
+                            json.dumps(other_details, ensure_ascii=False), time.strftime('%Y-%m-%d %H:%M:%S')
+                        )
+                    )
+                    insert_count += 1
+            logger.success(f"Successfully saved/updated {insert_count} listings for {city_name} in the database.")
+        except Exception as e:
+            logger.exception(f"Failed to save listings to database: {e}")
+
+
+class OikotieScraper:
+    """Represents a single scraping session with one browser instance."""
+    def __init__(self, headless=True):
+        self.headless = headless
+        self.driver, self.wait = self._init_driver()
+
+    def _init_driver(self):
+        logger.debug("Initializing new Chrome WebDriver instance...")
         chrome_options = Options()
-        if self.headless:
-            chrome_options.add_argument('--headless')
+        if self.headless: chrome_options.add_argument('--headless')
+        chrome_options.add_argument(f'user-agent={random.choice(USER_AGENTS)}')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--window-size=1920,1080')
-        chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--start-maximized')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
         
         try:
-            self.driver = webdriver.Chrome(options=chrome_options)
-            self.wait = WebDriverWait(self.driver, 15)
-            logger.info("Chrome WebDriver initialized successfully.")
+            driver = webdriver.Chrome(options=chrome_options)
+            wait = WebDriverWait(driver, 20) # Increased wait time for stability
+            return driver, wait
         except Exception as e:
             logger.critical(f"Failed to initialize WebDriver: {e}")
-            self.close_driver()
             raise
 
-    def close_driver(self):
-        """Closes the WebDriver session."""
-        if self.driver:
-            self.driver.quit()
-            logger.info("WebDriver closed.")
+    def close(self):
+        if self.driver: self.driver.quit()
 
-    def save_debug_info(self, failure_context):
-        """Saves page HTML and a screenshot for debugging."""
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        safe_context = re.sub(r'[\\/*?:"<>|]', "", failure_context)
-        debug_path = Path("debug")
-        debug_path.mkdir(exist_ok=True)
-        html_filename = debug_path / f"{safe_context}_{timestamp}.html"
-        screenshot_filename = debug_path / f"{safe_context}_{timestamp}.png"
-        
+    def _accept_cookies(self):
         try:
-            with open(html_filename, "w", encoding="utf-8") as f:
-                f.write(self.driver.page_source)
-            self.driver.save_screenshot(str(screenshot_filename))
-            logger.debug(f"Saved debug info: {html_filename} and {screenshot_filename}")
-        except Exception as e:
-            logger.error(f"Could not save debug info: {e}")
-
-    def accept_cookies(self):
-        """Handles the cookie banner."""
-        logger.info("Looking for cookie banner...")
-        try:
-            iframe = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "iframe[id^='sp_message_iframe']")))
-            self.driver.switch_to.frame(iframe)
-            logger.debug("Switched to cookie iframe.")
-            
-            accept_button = self.wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='Hyväksy kaikki']")))
-            accept_button.click()
-            
-            logger.success("Cookies accepted.")
+            self.wait.until(EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR, "iframe[id^='sp_message_iframe']")))
+            self.wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='Hyväksy kaikki']"))).click()
             self.driver.switch_to.default_content()
-            time.sleep(2)
         except TimeoutException:
-            logger.warning("Cookie banner not found or timed out. Continuing...")
+            logger.warning("Cookie banner not found or handled.")
             self.driver.switch_to.default_content()
-        except Exception as e:
-            logger.error(f"Error accepting cookies: {e}")
-            self.driver.switch_to.default_content()
-            self.save_debug_info("cookie_error")
 
-    def scrape_all_listings_for_city(self, city_url, limit=None):
-        """Scrapes listing summaries from a city, respecting the optional limit."""
-        all_listings = []
-        log_limit_msg = f"with a limit of {limit} listings" if limit else "for all pages"
-        logger.info(f"Initiating summary scrape {log_limit_msg}...")
-        self.driver.get(city_url)
-        self.accept_cookies()
-
+    def get_all_listing_summaries(self, url, limit=None):
+        logger.info(f"Initiating sequential summary scrape (limit: {limit or 'all'})...")
+        self.driver.get(url)
+        self._accept_cookies()
+        all_summaries = []
         page_num = 1
-        while True:
-            # Check if the limit has been reached *before* scraping the page
-            if limit and len(all_listings) >= limit:
-                logger.info(f"Listing limit of {limit} reached. Stopping summary extraction.")
-                break
-
-            logger.info(f"Scraping page {page_num}...")
-            try:
-                self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class*="cards-v2"]')))
-                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)
-
-                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-                current_page_listings = self._extract_listing_summaries(soup)
-                if not current_page_listings:
-                    logger.warning(f"No listings found on page {page_num}. Ending scrape.")
-                    break
-                
-                all_listings.extend(current_page_listings)
-                logger.success(f"Found {len(current_page_listings)} listings on page {page_num}. Total so far: {len(all_listings)}")
-
-                if not self._go_to_next_page():
-                    logger.info("No more pages found. Concluding summary extraction.")
-                    break
-                page_num += 1
-                time.sleep(3)
-
-            except Exception as e:
-                logger.error(f"An error occurred on page {page_num}: {e}")
-                self.save_debug_info(f"page_scrape_error_{page_num}")
-                break
-        
-        # Return the list, truncated to the exact limit if necessary
-        return all_listings[:limit] if limit else all_listings
-    
-    def _extract_listing_summaries(self, soup):
-        """Extracts listing summaries from the search page."""
-        listings = []
-        listing_cards = soup.select('a.ot-card-v2')
-        for card in listing_cards:
-            listing = {'source': 'oikotie'}
-            listing['url'] = urljoin('https://asunnot.oikotie.fi', card.get('href', ''))
-            title_elem = card.select_one('.card-v2-text-container__text strong')
-            if title_elem and listing['url']:
-                listing['title'] = title_elem.get_text(strip=True)
-                listings.append(listing)
-        return listings
-
-    def scrape_listing_details(self, listings):
-        """Enriches a list of listing summaries with detailed information."""
-        if not listings:
-            logger.warning("No listings provided for detail scraping.")
-            return []
+        while not (limit and len(all_summaries) >= limit):
+            logger.info(f"Scraping summary page {page_num}...")
+            self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class*="cards-v2"]')))
+            time.sleep(1) # Gentle pause
+            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
-        logger.info(f"Starting detail scraping for {len(listings)} listings.")
-        for i, listing in enumerate(listings):
-            logger.info(f"Processing details for: {listing['url']} ({i+1}/{len(listings)})")
-            try:
-                self.driver.get(listing['url'])
-                self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "details-grid")))
-                time.sleep(1)
-                
-                detail_soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-                details_data, overview, description = self._parse_oikotie_details_page(detail_soup)
-                
-                listing['details'] = details_data
-                listing['overview'] = overview
-                listing['full_description'] = description
+            summaries = self._parse_listing_summaries(soup)
+            if not summaries:
+                logger.warning(f"No listings found on page {page_num}. Ending.")
+                break
+            
+            all_summaries.extend(summaries)
+            if not self._go_to_next_page():
+                logger.info("No more pages found.")
+                break
+            page_num += 1
+            time.sleep(random.uniform(1.0, 2.5))
+        return all_summaries[:limit] if limit else all_summaries
 
-            except Exception as e:
-                logger.error(f"Failed to scrape details for {listing['url']}: {e}")
-                self.save_debug_info(f"detail_failure_{i}")
-                listing['details'] = {"error": "Failed to scrape details."}
+    def get_single_listing_details(self, listing_summary):
+        try:
+            time.sleep(random.uniform(2.0, 5.0)) # Longer, more human-like delay
+            self.driver.get(listing_summary['url'])
+            self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "details-grid")))
+            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+            details, overview, description = self._parse_oikotie_details_page(soup)
+            listing_summary.update({'details': details, 'overview': overview, 'full_description': description})
+        except Exception as e:
+            logger.error(f"Failed to process {listing_summary.get('url')}: {e}")
+            listing_summary['details'] = {"error": str(e)}
+        return listing_summary
+
+    def _parse_listing_summaries(self, soup):
+        listings = []
+        for card in soup.select('a.ot-card-v2'):
+            url = urljoin('https://asunnot.oikotie.fi', card.get('href', ''))
+            title_elem = card.select_one('.card-v2-text-container__text strong')
+            if title_elem and url:
+                listings.append({'source': 'oikotie', 'url': url, 'title': title_elem.get_text(strip=True)})
         return listings
-    
+
     def _parse_oikotie_details_page(self, soup):
-        """Parses the detailed information and description from a listing page."""
-        details = {}
+        details, overview, full_description = {}, "", ""
         for item in soup.select('.info-table__row, .key-value-items__item, .details-grid__item dl'):
             key_elem = item.select_one('dt, .info-table__title, .key-value-items__title')
             value_elem = item.select_one('dd, .info-table__value, .key-value-items__value')
             if key_elem and value_elem:
                 key = normalize_key(key_elem.get_text(strip=True))
                 value = value_elem.get_text(strip=True, separator='\n').replace('\u00a0', ' ').strip()
-                if key:
-                    details[key] = value
-
+                if key: details[key] = value
         overview = self._get_text_from_element(soup, 'div.listing-overview')
         full_description = self._get_text_from_element(soup, 'div[class*="listing-description"]')
-            
         return details, overview, full_description
-
-    def _get_text_from_element(self, soup, selector):
-        """Safely gets formatted text from a Beautiful Soup element."""
-        element = soup.select_one(selector)
-        if element:
-            return '\n\n'.join([p.get_text(strip=True) for p in element.find_all('p', recursive=False)])
-        return ""
         
+    def _get_text_from_element(self, soup, selector):
+        element = soup.select_one(selector)
+        return '\n\n'.join([p.get_text(strip=True) for p in element.find_all('p', recursive=False)]) if element else ""
+
     def _go_to_next_page(self):
-        """Navigates to the next page, if available."""
         try:
-            next_button_xpath = "//button[.//span[text()='Seuraava']]"
-            next_button = self.driver.find_element(By.XPATH, next_button_xpath)
+            next_button = self.driver.find_element(By.XPATH, "//button[.//span[text()='Seuraava']]")
             if next_button.is_enabled():
                 self.driver.execute_script("arguments[0].click();", next_button)
-                logger.debug("Clicked 'next page' button.")
                 return True
-            else:
-                logger.info("'Next page' button is disabled.")
-                return False
-        except NoSuchElementException:
-            logger.info("'Next page' button not found.")
-            return False
+        except NoSuchElementException: return False
+        return False
+
+def worker_scrape_details(listing_summaries_chunk):
+    """Worker target. Creates one browser session to process a chunk of URLs."""
+    scraper = OikotieScraper(headless=True)
+    results = []
+    try:
+        for summary in listing_summaries_chunk:
+            logger.info(f"Worker processing: {summary['url']}")
+            results.append(scraper.get_single_listing_details(summary))
+    finally:
+        scraper.close()
+    return results
 
 def load_config(config_path='config.json'):
-    """Loads scraping tasks from the configuration file."""
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        return config.get('tasks', [])
+            return json.load(f).get('tasks', [])
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        logger.critical(f"Error loading config file: {e}")
+        logger.critical(f"Error loading config file '{config_path}': {e}")
         return []
 
-def save_results(city, listings):
-    """Saves the scraped listings to a structured JSON file."""
-    if not listings:
-        logger.warning(f"No listings to save for {city}.")
-        return
+class ScraperOrchestrator:
+    """Manages the entire scraping workflow for all tasks."""
+    def __init__(self, config_path='config.json'):
+        self.tasks = load_config(config_path)
+        self.db_manager = DatabaseManager()
 
-    today = time.strftime('%Y/%m/%d')
-    output_dir = Path("output") / city / today
-    output_dir.mkdir(parents=True, exist_ok=True)
+    def run(self):
+        if not self.tasks:
+            logger.error("No tasks found in config.json. Exiting.")
+            return
 
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    filename = output_dir / f"{city}_{timestamp}.json"
-    
-    try:
-        with open(filename, 'w', encoding='utf-8') as f:
-            json_data = {
-                'city': city,
-                'total_listings': len(listings),
-                'scraped_at': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'listings': listings
-            }
-            json.dump(json_data, f, ensure_ascii=False, indent=2)
-        logger.success(f"Successfully saved {len(listings)} listings for {city} to {filename}")
-    except Exception as e:
-        logger.error(f"Failed to save results to {filename}: {e}")
+        for task in self.tasks:
+            if not task.get("enabled", False):
+                logger.info(f"Skipping disabled task: {task.get('city')}")
+                continue
 
-def main():
-    """Main function to run the scraper based on the config file."""
-    tasks = load_config()
-    if not tasks:
-        logger.error("No tasks found in config.json. Exiting.")
-        return
-
-    for task in tasks:
-        city = task.get("city")
-        url = task.get("url")
-        enabled = task.get("enabled", False)
-        limit = task.get("listing_limit") # Can be None if not present
-
-        if not enabled:
-            logger.info(f"Skipping disabled task for city: {city}")
-            continue
-
-        if not city or not url:
-            logger.warning(f"Skipping task due to missing 'city' or 'url': {task}")
-            continue
+            city, url, limit, max_workers = (
+                task.get("city"), task.get("url"), 
+                task.get("listing_limit"), task.get("max_detail_workers", 5)
+            )
+            logger.info(f"--- Starting task for city: {city} ---")
             
-        logger.info(f"--- Starting task for city: {city} ---")
-        scraper = OikotieScraper(headless=True)
-        try:
-            listing_summaries = scraper.scrape_all_listings_for_city(url, limit=limit)
-            if listing_summaries:
-                detailed_listings = scraper.scrape_listing_details(listing_summaries)
-                save_results(city, detailed_listings)
-            else:
-                logger.warning(f"No listings found for {city}. No details will be scraped.")
-        except Exception as e:
-            logger.critical(f"A critical error occurred during the task for {city}: {e}")
-        finally:
-            scraper.close_driver()
-            logger.info(f"--- Task for city: {city} finished ---")
+            try:
+                # Phase 1: Scrape summaries sequentially for stability
+                summary_scraper = OikotieScraper(headless=True)
+                listing_summaries = summary_scraper.get_all_listing_summaries(url, limit=limit)
+                summary_scraper.close()
+
+                if not listing_summaries:
+                    logger.warning(f"No listings found for {city}. Task finished.")
+                    continue
+
+                # Phase 2: Scrape details in parallel
+                logger.info(f"Distributing {len(listing_summaries)} URLs to {max_workers} workers...")
+                # Chunk the summaries for the workers
+                chunks = [listing_summaries[i::max_workers] for i in range(max_workers)]
+                
+                detailed_listings = []
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = [executor.submit(worker_scrape_details, chunk) for chunk in chunks]
+                    for future in as_completed(futures):
+                        detailed_listings.extend(future.result())
+                        logger.info(f"Detail scraping progress: {len(detailed_listings)}/{len(listing_summaries)}")
+                
+                # Phase 3: Save results to database
+                self.db_manager.save_listings(detailed_listings, city)
+
+            except Exception as e:
+                logger.critical(f"A critical error occurred during the task for {city}: {e}")
+            finally:
+                logger.info(f"--- Task for city: {city} finished ---")
+
 
 if __name__ == "__main__":
-    main()
+    orchestrator = ScraperOrchestrator()
+    orchestrator.run()

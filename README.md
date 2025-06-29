@@ -1,16 +1,17 @@
 # Finnish Real Estate Scraper
 
-A Python-based web scraper designed to extract real estate listing data from Finnish websites like Oikotie.fi. The project is built to be modular, scalable, and resilient, allowing for easy expansion to new cities and websites. It uses `uv` for fast dependency and environment management.
+A Python-based web scraper designed to extract real estate listing data from Finnish websites like Oikotie.fi. The project is built to be modular, scalable, and resilient, using DuckDB for efficient data storage and `uv` for dependency management.
 
 ## Features
 
--   **Modular & Config-Driven**: Easily add or disable scraping tasks for different cities by editing `config.json`—no code changes needed.
--   **Deep Data Extraction**: Scrapes both summary data from search result pages and detailed information from individual listing pages.
--   **Configurable Limits**: Set a maximum number of listings to scrape per task, ideal for quick tests, development, and benchmarking.
--   **Organized Output**: Automatically saves scraped data into a structured directory format: `output/CityName/YYYY/MM/DD/CityName_Timestamp.json`.
+-   **Parallel Processing**: Drastically speeds up scraping by processing multiple listing detail pages concurrently using a configurable pool of worker threads.
+-   **Modular & Config-Driven**: Easily add or disable scraping tasks for different cities by editing `config.json`.
+-   **Structured Database Storage**: Saves data into a DuckDB database (`output/real_estate.duckdb`) with a hybrid schema:
+    -   **Core Columns**: Key fields like price, size, and year are stored in dedicated, typed columns for fast querying.
+    -   **JSON "Catch-All"**: All other miscellaneous details are stored in a single JSON column, providing flexibility and ensuring no data is lost.
+-   **Upsert Logic**: Uses `INSERT OR REPLACE` to ensure that listings are updated upon re-scraping, preventing duplicate data.
+-   **Configurable Limits**: Set a maximum number of listings to scrape per task, ideal for quick tests and development.
 -   **Advanced Logging**: Utilizes `loguru` for clear, colorized console output and detailed, rotating log files.
--   **Robust Error Handling**: If scraping a specific page fails, the script saves debug information (HTML and screenshot) and continues with the rest of the tasks.
--   **Modern Tooling**: Uses `uv` for a fast and efficient development environment and dependency management.
 
 ## Project Structure
 
@@ -19,24 +20,18 @@ A Python-based web scraper designed to extract real estate listing data from Fin
 ├── config.json           # Defines scraping tasks (cities, URLs, limits)
 ├── scraper.py            # The main scraper script
 ├── pyproject.toml        # Project metadata and dependencies for uv
-├── uv.lock               # Pinned versions of dependencies
 ├── .gitignore            # Specifies files for Git to ignore
 ├── logs/                 # Directory for runtime log files
-├── output/               # Directory for the final JSON data output
-└── debug/                # Directory for HTML/screenshot debug files on error
+└── output/               # Directory for the final database file
+    └── real_estate.duckdb
 ```
 
 ## Setup and Installation
 
-Follow these steps to set up the project environment.
-
 **Prerequisites:**
 -   Python 3.8+
--   Google Chrome browser installed. The script uses Selenium and requires a corresponding Chrome browser.
--   `uv` installed. If you don't have it, install it with pip:
-    ```sh
-    pip install uv
-    ```
+-   Google Chrome browser installed.
+-   `uv` installed. If you don't have it: `pip install uv`.
 
 **Installation Steps:**
 
@@ -46,30 +41,22 @@ Follow these steps to set up the project environment.
     cd <your-repo-name>
     ```
 
-2.  **Create and activate a virtual environment using `uv`:**
+2.  **Create and activate a virtual environment:**
     ```sh
-    # Create the virtual environment
     uv venv
-
-    # Activate the environment
-    # On Windows (CMD/PowerShell)
-    .venv\Scripts\activate
-
-    # On macOS/Linux (Bash/Zsh)
-    source .venv/bin/activate
+    source .venv/bin/activate  # On macOS/Linux
+    # .venv\Scripts\activate  # On Windows
     ```
 
-3.  **Install the required dependencies using `uv`:**
-    The project dependencies are listed in `pyproject.toml`. Install them with:
+3.  **Install dependencies:**
     ```sh
     uv pip install -e .
     ```
-    This command reads the `pyproject.toml` file and installs packages like `selenium`, `beautifulsoup4`, and `loguru`.
 
 ## Usage
 
 1.  **Configure Your Tasks:**
-    Open the `config.json` file to define what the scraper should do. Each object in the `tasks` list represents a job.
+    Open `config.json` to define scraping jobs.
 
     ```json
     {
@@ -78,64 +65,56 @@ Follow these steps to set up the project environment.
           "city": "Helsinki",
           "enabled": true,
           "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
-          "listing_limit": 10
-        },
-        {
-          "city": "Espoo",
-          "enabled": false,
-          "url": "..."
+          "listing_limit": 20,
+          "max_detail_workers": 5
         }
       ]
     }
     ```
-
-    **Configuration Options:**
-    -   **`"city"`**: The name of the city. This is used for creating the output directory.
-    -   **`"enabled"`**: Set to `true` to run the task, or `false` to skip it.
-    -   **`"url"`**: The full Oikotie search URL for the desired city and filters.
-    -   **`"listing_limit"` (Optional)**: Add this key to limit the number of listings scraped for a task. If this key is omitted, the scraper will fetch **all** listings from **all** pages, which can take a very long time. This is highly recommended for development and testing.
+    -   **`"enabled"`**: `true` to run the task, `false` to skip.
+    -   **`"listing_limit"` (Optional)**: Limits the number of listings to scrape. If omitted, it scrapes all listings.
+    -   **`"max_detail_workers"` (Optional)**: Sets the number of parallel browser instances for scraping details. Defaults to 5. Adjust based on your system's RAM and CPU.
 
 2.  **Run the Scraper:**
-    Execute the main script from your terminal:
     ```sh
     python scraper.py
     ```
 
-3.  **Find the Output:**
-    The script will start scraping the enabled tasks one by one. Upon completion, the data will be saved in the `output/` directory, following the structured path. For example: `output/Helsinki/2025/06/29/Helsinki_20250629-153000.json`.
+3.  **Query the Data:**
+    All data is saved to `output/real_estate.duckdb`.
 
-## How to Extend the Scraper
+### Example Queries
 
-### Adding a New City
+Using the DuckDB CLI (`pip install duckdb-cli`):
 
-1.  Find the Oikotie search URL for the desired city (e.g., Vantaa).
-2.  Open `config.json`.
-3.  Add a new JSON object to the `tasks` list for the new city.
-4.  Set `"enabled": true`.
+```sh
+# Connect to the database
+duckdb output/real_estate.duckdb
 
-    **Example for Vantaa:**
-    ```json
-    {
-      "city": "Vantaa",
-      "enabled": true,
-      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B50,6,%22Vantaa%22%5D%5D&cardType=100"
-    }
-    ```
+# See the table schema
+DESCRIBE listings;
 
-### Adding a New Website (e.g., Etuovi.com)
+# Find the 5 cheapest 3-room apartments in Helsinki built after 2010
+SELECT url, title, price_eur, size_m2, year_built
+FROM listings
+WHERE city = 'Helsinki' AND rooms = 3 AND year_built > 2010
+ORDER BY price_eur ASC
+LIMIT 5;
 
-The scraper is designed to be modular. To add a new website, you would need to:
-1.  Add a new task for it in `config.json`.
-2.  Add logic to `scraper.py` to handle the new site's unique HTML structure and pagination.
-3.  Update the main execution loop to call the correct functions for the new site.
+# Query a field from the JSON details column
+SELECT 
+    title, 
+    json_extract_string(other_details_json, '$.kunto') AS condition
+FROM listings
+WHERE condition = 'Hyvä';
+```
 
 ## Main Dependencies
 
--   **Selenium**: For browser automation and interacting with JavaScript-heavy pages.
--   **BeautifulSoup4**: For parsing HTML and extracting data.
--   **Loguru**: For powerful and easy-to-use logging.
--   **uv**: For creating the virtual environment and managing dependencies.
-
+-   **DuckDB**: An in-process SQL OLAP database for data storage.
+-   **Selenium**: For browser automation.
+-   **BeautifulSoup4**: For parsing HTML.
+-   **Loguru**: For powerful logging.
+-   **uv**: For dependency management.
 ---
-
 This project is intended for educational purposes. Please be responsible and respect the terms of service of the websites you scrape.
