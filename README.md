@@ -2,31 +2,35 @@
 
 A Python-based web scraper designed to extract real estate listing data from Finnish websites like Oikotie.fi. The project is built to be modular, scalable, and resilient, using DuckDB for efficient data storage and `uv` for dependency management.
 
-## Features
+## Key Features
 
--   **Parallel Processing**: Drastically speeds up scraping by processing multiple listing detail pages concurrently using a configurable pool of worker threads.
--   **Modular & Config-Driven**: Easily add or disable scraping tasks for different cities by editing `config.json`.
--   **Structured Database Storage**: Saves data into a DuckDB database (`output/real_estate.duckdb`) with a hybrid schema:
-    -   **Core Columns**: Key fields like price, size, and year are stored in dedicated, typed columns for fast querying.
-    -   **JSON "Catch-All"**: All other miscellaneous details are stored in a single JSON column, providing flexibility and ensuring no data is lost.
--   **Upsert Logic**: Uses `INSERT OR REPLACE` to ensure that listings are updated upon re-scraping, preventing duplicate data.
--   **Configurable Limits**: Set a maximum number of listings to scrape per task, ideal for quick tests and development.
--   **Advanced Logging**: Utilizes `loguru` for clear, colorized console output and detailed, rotating log files.
+-   **Stable Parallel Architecture**: The scraper uses a robust two-phase process to maximize speed and stability:
+    1.  **Sequential Summary Scan**: A single, stable browser instance first discovers all listing URLs to prevent crashes during pagination.
+    2.  **Parallel Detail Scraping**: The collected URLs are then distributed to a pool of parallel workers, each with its own browser instance, to scrape detailed information concurrently.
+-   **Config-Driven**: Easily add or disable scraping tasks for different cities and control concurrency by editing `config.json`.
+-   **Structured Database Storage**: Saves all data into a DuckDB database (`output/real_estate.duckdb`) with a hybrid schema for fast querying and data integrity.
+-   **Anti-Bot Detection Measures**: Incorporates techniques like User-Agent rotation and randomized delays to mimic human behavior and reduce the risk of being blocked.
+-   **Advanced Logging & Debugging**: Utilizes `loguru` for clear console output and detailed log files. Automatically saves debug info on errors.
+-   **Interactive Analysis Notebook**: Includes a `test.py` Marimo notebook for interactive data exploration, featuring tables and a real map visualization with geocoded addresses via `folium`.
 
 ## Project Structure
 
 ```
 .
 ├── config.json           # Defines scraping tasks (cities, URLs, limits)
-├── scraper.py            # The main scraper script
+├── scraper.py            # The main scraper script (run this file)
+├── test.py               # The Marimo notebook for data analysis
 ├── pyproject.toml        # Project metadata and dependencies for uv
 ├── .gitignore            # Specifies files for Git to ignore
 ├── logs/                 # Directory for runtime log files
-└── output/               # Directory for the final database file
-    └── real_estate.duckdb
+├── output/               # Directory for the final database file
+│   └── real_estate.duckdb
+└── debug/                # Directory for HTML/screenshot debug files on error
 ```
 
 ## Setup and Installation
+
+Follow these steps to set up the project environment.
 
 **Prerequisites:**
 -   Python 3.8+
@@ -41,23 +45,30 @@ A Python-based web scraper designed to extract real estate listing data from Fin
     cd <your-repo-name>
     ```
 
-2.  **Create and activate a virtual environment:**
+2.  **Create and activate a virtual environment using `uv`:**
     ```sh
     uv venv
     source .venv/bin/activate  # On macOS/Linux
     # .venv\Scripts\activate  # On Windows
     ```
 
-3.  **Install dependencies:**
+3.  **Install all dependencies using `uv`:**
+    This reads `pyproject.toml` and installs all necessary packages.
     ```sh
     uv pip install -e .
     ```
 
-## Usage
+## Complete Workflow: From Scraping to Analysis
 
-1.  **Configure Your Tasks:**
-    Open `config.json` to define scraping jobs.
+This project has two main scripts: `scraper.py` for fetching data and `test.py` for analyzing it. Due to database file locking, they should be run one at a time.
 
+### Step 1: Configure and Run the Scraper
+
+1.  **Close the Analysis Notebook**:
+    > ⚠️ **IMPORTANT**: Before running the scraper, ensure that the Marimo notebook (`test.py`) or any other program connected to `output/real_estate.duckdb` is **not running**. If it is, the scraper will fail with a file lock error. Stop it with `Ctrl + C` in its terminal.
+
+2.  **Configure `config.json`**:
+    Open the file to define your scraping tasks.
     ```json
     {
       "tasks": [
@@ -65,56 +76,42 @@ A Python-based web scraper designed to extract real estate listing data from Fin
           "city": "Helsinki",
           "enabled": true,
           "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
-          "listing_limit": 20,
+          "listing_limit": 50,
           "max_detail_workers": 5
         }
       ]
     }
     ```
-    -   **`"enabled"`**: `true` to run the task, `false` to skip.
-    -   **`"listing_limit"` (Optional)**: Limits the number of listings to scrape. If omitted, it scrapes all listings.
-    -   **`"max_detail_workers"` (Optional)**: Sets the number of parallel browser instances for scraping details. Defaults to 5. Adjust based on your system's RAM and CPU.
+    -   `"enabled"`: `true` to run the task, `false` to skip.
+    -   `"listing_limit"` (Optional): Limits the number of listings to scrape. **Recommended for testing.** If omitted, the scraper will attempt to fetch all listings from all pages.
+    -   `"max_detail_workers"` (Optional): Sets the number of parallel browser instances for scraping details. A good starting value is 4-8, depending on your system's RAM and CPU.
 
-2.  **Run the Scraper:**
+3.  **Run the scraper script**:
     ```sh
     python scraper.py
     ```
+    The script will log its progress to the console. Wait for it to complete.
 
-3.  **Query the Data:**
-    All data is saved to `output/real_estate.duckdb`.
+### Step 2: Analyze the Data with Marimo
 
-### Example Queries
+1.  **Start the Marimo server**:
+    Once the scraper is finished, you can start the interactive notebook to view the results.
+    ```sh
+    marimo run test.py
+    ```
 
-Using the DuckDB CLI (`pip install duckdb-cli`):
+2.  **Open the Notebook**:
+    Marimo will provide a URL in your terminal (e.g., `http://localhost:2718`). Open this in your browser.
 
-```sh
-# Connect to the database
-duckdb output/real_estate.duckdb
+3.  **Explore the Data**:
+    - The notebook will connect to the `real_estate.duckdb` file.
+    - You will see cells displaying the first 10 rows, the top 10 most expensive listings, and a map.
+    - The map cell will geocode addresses in real-time, which will take about **1 second per listing** due to rate limiting. Please be patient while it runs.
 
-# See the table schema
-DESCRIBE listings;
+## Troubleshooting
 
-# Find the 5 cheapest 3-room apartments in Helsinki built after 2010
-SELECT url, title, price_eur, size_m2, year_built
-FROM listings
-WHERE city = 'Helsinki' AND rooms = 3 AND year_built > 2010
-ORDER BY price_eur ASC
-LIMIT 5;
+> **Error:** `duckdb.duckdb.IOException: IO Error: Cannot open file... because it is being used by another process.`
 
-# Query a field from the JSON details column
-SELECT 
-    title, 
-    json_extract_string(other_details_json, '$.kunto') AS condition
-FROM listings
-WHERE condition = 'Hyvä';
-```
+This is the most common error. It means another program (almost certainly the Marimo notebook) has the database file open.
 
-## Main Dependencies
-
--   **DuckDB**: An in-process SQL OLAP database for data storage.
--   **Selenium**: For browser automation.
--   **BeautifulSoup4**: For parsing HTML.
--   **Loguru**: For powerful logging.
--   **uv**: For dependency management.
----
-This project is intended for educational purposes. Please be responsible and respect the terms of service of the websites you scrape.
+**Solution**: Stop the Marimo server (`Ctrl + C`) and then re-run the `scraper.py` script.
