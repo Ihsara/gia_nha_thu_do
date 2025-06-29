@@ -1,3 +1,30 @@
+# Finnish Real Estate Scraper
+
+A Python-based web scraper designed to extract real estate listing data from Finnish websites like Oikotie.fi. The project is built to be modular, scalable, and resilient, allowing for easy expansion to new cities and websites. It uses `uv` for fast dependency and environment management.
+
+## Features
+
+-   **Modular & Config-Driven**: Easily add or disable scraping tasks for different cities by editing `config.json`—no code changes needed.
+-   **Deep Data Extraction**: Scrapes both summary data from search result pages and detailed information from individual listing pages.
+-   **Configurable Limits**: Set a maximum number of listings to scrape per task, ideal for quick tests, development, and benchmarking.
+-   **Organized Output**: Automatically saves scraped data into a structured directory format: `output/CityName/YYYY/MM/DD/CityName_Timestamp.json`.
+-   **Advanced Logging**: Utilizes `loguru` for clear, colorized console output and detailed, rotating log files.
+-   **Robust Error Handling**: If scraping a specific page fails, the script saves debug information (HTML and screenshot) and continues with the rest of the tasks.
+-   **Modern Tooling**: Uses `uv` for a fast and efficient development environment and dependency management.
+
+## Project Structure
+
+```
+.
+├── config.json           # Defines scraping tasks (cities, URLs, limits)
+├── scraper.py            # The main scraper script
+├── pyproject.toml        # Project metadata and dependencies for uv
+├── uv.lock               # Pinned versions of dependencies
+├── .gitignore            # Specifies files for Git to ignore
+├── logs/                 # Directory for runtime log files
+├── output/               # Directory for the final JSON data output
+└── debug/                # Directory for HTML/screenshot debug files on error
+```
 
 ## Setup and Installation
 
@@ -42,7 +69,7 @@ Follow these steps to set up the project environment.
 ## Usage
 
 1.  **Configure Your Tasks:**
-    Open the `config.json` file. To scrape a city, set its `"enabled"` property to `true`. You can enable multiple cities.
+    Open the `config.json` file to define what the scraper should do. Each object in the `tasks` list represents a job.
 
     ```json
     {
@@ -50,7 +77,8 @@ Follow these steps to set up the project environment.
         {
           "city": "Helsinki",
           "enabled": true,
-          "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100"
+          "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+          "listing_limit": 10
         },
         {
           "city": "Espoo",
@@ -60,6 +88,12 @@ Follow these steps to set up the project environment.
       ]
     }
     ```
+
+    **Configuration Options:**
+    -   **`"city"`**: The name of the city. This is used for creating the output directory.
+    -   **`"enabled"`**: Set to `true` to run the task, or `false` to skip it.
+    -   **`"url"`**: The full Oikotie search URL for the desired city and filters.
+    -   **`"listing_limit"` (Optional)**: Add this key to limit the number of listings scraped for a task. If this key is omitted, the scraper will fetch **all** listings from **all** pages, which can take a very long time. This is highly recommended for development and testing.
 
 2.  **Run the Scraper:**
     Execute the main script from your terminal:
@@ -92,9 +126,8 @@ Follow these steps to set up the project environment.
 
 The scraper is designed to be modular. To add a new website, you would need to:
 1.  Add a new task for it in `config.json`.
-2.  Update the `detect_site_type` method in `scraper.py` to recognize the new site's URL.
-3.  Create new parsing methods specific to the new site's HTML structure (e.g., `_extract_etuovi_summaries`, `_parse_etuovi_details_page`).
-4.  Update the main `run` method to call the appropriate functions based on the detected site type.
+2.  Add logic to `scraper.py` to handle the new site's unique HTML structure and pagination.
+3.  Update the main execution loop to call the correct functions for the new site.
 
 ## Main Dependencies
 

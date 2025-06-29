@@ -14,7 +14,6 @@ from bs4 import BeautifulSoup
 from loguru import logger
 
 # --- Loguru Configuration ---
-# Clear default handlers and set up new ones for file and console
 logger.remove()
 log_path = Path("logs") / "scraper_{time:YYYY-MM-DD}.log"
 logger.add(log_path, rotation="1 day", retention="7 days", level="DEBUG", format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}")
@@ -97,15 +96,21 @@ class OikotieScraper:
             self.driver.switch_to.default_content()
             self.save_debug_info("cookie_error")
 
-    def scrape_all_listings_for_city(self, city_url):
-        """Scrapes all listings from all pages for a given city URL."""
+    def scrape_all_listings_for_city(self, city_url, limit=None):
+        """Scrapes listing summaries from a city, respecting the optional limit."""
         all_listings = []
-        logger.info("Initiating scrape for all pages...")
+        log_limit_msg = f"with a limit of {limit} listings" if limit else "for all pages"
+        logger.info(f"Initiating summary scrape {log_limit_msg}...")
         self.driver.get(city_url)
         self.accept_cookies()
 
         page_num = 1
         while True:
+            # Check if the limit has been reached *before* scraping the page
+            if limit and len(all_listings) >= limit:
+                logger.info(f"Listing limit of {limit} reached. Stopping summary extraction.")
+                break
+
             logger.info(f"Scraping page {page_num}...")
             try:
                 self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class*="cards-v2"]')))
@@ -132,7 +137,8 @@ class OikotieScraper:
                 self.save_debug_info(f"page_scrape_error_{page_num}")
                 break
         
-        return all_listings
+        # Return the list, truncated to the exact limit if necessary
+        return all_listings[:limit] if limit else all_listings
     
     def _extract_listing_summaries(self, soup):
         """Extracts listing summaries from the search page."""
@@ -149,6 +155,10 @@ class OikotieScraper:
 
     def scrape_listing_details(self, listings):
         """Enriches a list of listing summaries with detailed information."""
+        if not listings:
+            logger.warning("No listings provided for detail scraping.")
+            return []
+            
         logger.info(f"Starting detail scraping for {len(listings)} listings.")
         for i, listing in enumerate(listings):
             logger.info(f"Processing details for: {listing['url']} ({i+1}/{len(listings)})")
@@ -257,6 +267,7 @@ def main():
         city = task.get("city")
         url = task.get("url")
         enabled = task.get("enabled", False)
+        limit = task.get("listing_limit") # Can be None if not present
 
         if not enabled:
             logger.info(f"Skipping disabled task for city: {city}")
@@ -269,7 +280,7 @@ def main():
         logger.info(f"--- Starting task for city: {city} ---")
         scraper = OikotieScraper(headless=True)
         try:
-            listing_summaries = scraper.scrape_all_listings_for_city(url)
+            listing_summaries = scraper.scrape_all_listings_for_city(url, limit=limit)
             if listing_summaries:
                 detailed_listings = scraper.scrape_listing_details(listing_summaries)
                 save_results(city, detailed_listings)
