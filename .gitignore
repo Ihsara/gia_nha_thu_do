@@ -1,0 +1,47 @@
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Marimo specific
+.marimo/
+__marimo__/
+
+# Log files and Debugging output
+logs/
+*.log
+debug/
+*.png
+*.html
+
+# Data output files
+output/
+*.json
+
+# Dependency management files
+# Keep uv.lock if you want to pin exact dependency versions,
+# otherwise, you can ignore it if you prefer to resolve from pyproject.toml.
+# For reproducibility, it's often better to keep it.
+# uv.lock
+
+# Specific files from your directory listing
+scraper.log
+real_estate_listings_detailed.json
+
+# Operating System files
+.DS_Store
+Thumbs.db
