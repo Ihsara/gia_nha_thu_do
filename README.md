@@ -1,3 +1,32 @@
+# Finnish Real Estate Scraper
+
+A Python-based web scraper designed to extract real estate listing data from Finnish websites like Oikotie.fi. The project is built to be modular, scalable, and resilient, using DuckDB for efficient data storage and `uv` for dependency management.
+
+## Key Features
+
+-   **Stable Parallel Architecture**: The scraper uses a robust two-phase process to maximize speed and stability:
+    1.  **Sequential Summary Scan**: A single, stable browser instance first discovers all listing URLs to prevent crashes during pagination.
+    2.  **Parallel Detail Scraping**: The collected URLs are then distributed to a pool of parallel workers, each with its own browser instance, to scrape detailed information concurrently.
+-   **Config-Driven**: Easily add or disable scraping tasks for different cities and control concurrency by editing `config.json`.
+-   **Structured Database Storage**: Saves all data into a DuckDB database (`output/real_estate.duckdb`) with a hybrid schema for fast querying and data integrity.
+-   **Anti-Bot Detection Measures**: Incorporates techniques like User-Agent rotation and randomized delays to mimic human behavior and reduce the risk of being blocked.
+-   **Advanced Logging & Debugging**: Utilizes `loguru` for clear console output and detailed log files. Automatically saves debug info on errors.
+-   **Interactive Analysis Notebook**: Includes a `test.py` Marimo notebook for interactive data exploration, featuring tables and a real map visualization with geocoded addresses via `folium`.
+
+## Project Structure
+
+```
+.
+├── config.json           # Defines scraping tasks (cities, URLs, limits)
+├── scraper.py            # The main scraper script (run this file)
+├── test.py               # The Marimo notebook for data analysis
+├── pyproject.toml        # Project metadata and dependencies for uv
+├── .gitignore            # Specifies files for Git to ignore
+├── logs/                 # Directory for runtime log files
+├── output/               # Directory for the final database file
+│   └── real_estate.duckdb
+└── debug/                # Directory for HTML/screenshot debug files on error
+```
 
 ## Setup and Installation
 
@@ -5,11 +34,8 @@ Follow these steps to set up the project environment.
 
 **Prerequisites:**
 -   Python 3.8+
--   Google Chrome browser installed. The script uses Selenium and requires a corresponding Chrome browser.
--   `uv` installed. If you don't have it, install it with pip:
-    ```sh
-    pip install uv
-    ```
+-   Google Chrome browser installed.
+-   `uv` installed. If you don't have it: `pip install uv`.
 
 **Installation Steps:**
 
@@ -21,88 +47,71 @@ Follow these steps to set up the project environment.
 
 2.  **Create and activate a virtual environment using `uv`:**
     ```sh
-    # Create the virtual environment
     uv venv
-
-    # Activate the environment
-    # On Windows (CMD/PowerShell)
-    .venv\Scripts\activate
-
-    # On macOS/Linux (Bash/Zsh)
-    source .venv/bin/activate
+    source .venv/bin/activate  # On macOS/Linux
+    # .venv\Scripts\activate  # On Windows
     ```
 
-3.  **Install the required dependencies using `uv`:**
-    The project dependencies are listed in `pyproject.toml`. Install them with:
+3.  **Install all dependencies using `uv`:**
+    This reads `pyproject.toml` and installs all necessary packages.
     ```sh
     uv pip install -e .
     ```
-    This command reads the `pyproject.toml` file and installs packages like `selenium`, `beautifulsoup4`, and `loguru`.
 
-## Usage
+## Complete Workflow: From Scraping to Analysis
 
-1.  **Configure Your Tasks:**
-    Open the `config.json` file. To scrape a city, set its `"enabled"` property to `true`. You can enable multiple cities.
+This project has two main scripts: `scraper.py` for fetching data and `test.py` for analyzing it. Due to database file locking, they should be run one at a time.
 
+### Step 1: Configure and Run the Scraper
+
+1.  **Close the Analysis Notebook**:
+    > ⚠️ **IMPORTANT**: Before running the scraper, ensure that the Marimo notebook (`test.py`) or any other program connected to `output/real_estate.duckdb` is **not running**. If it is, the scraper will fail with a file lock error. Stop it with `Ctrl + C` in its terminal.
+
+2.  **Configure `config.json`**:
+    Open the file to define your scraping tasks.
     ```json
     {
       "tasks": [
         {
           "city": "Helsinki",
           "enabled": true,
-          "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100"
-        },
-        {
-          "city": "Espoo",
-          "enabled": false,
-          "url": "..."
+          "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+          "listing_limit": 50,
+          "max_detail_workers": 5
         }
       ]
     }
     ```
+    -   `"enabled"`: `true` to run the task, `false` to skip.
+    -   `"listing_limit"` (Optional): Limits the number of listings to scrape. **Recommended for testing.** If omitted, the scraper will attempt to fetch all listings from all pages.
+    -   `"max_detail_workers"` (Optional): Sets the number of parallel browser instances for scraping details. A good starting value is 4-8, depending on your system's RAM and CPU.
 
-2.  **Run the Scraper:**
-    Execute the main script from your terminal:
+3.  **Run the scraper script**:
     ```sh
     python scraper.py
     ```
+    The script will log its progress to the console. Wait for it to complete.
 
-3.  **Find the Output:**
-    The script will start scraping the enabled tasks one by one. Upon completion, the data will be saved in the `output/` directory, following the structured path. For example: `output/Helsinki/2025/06/29/Helsinki_20250629-153000.json`.
+### Step 2: Analyze the Data with Marimo
 
-## How to Extend the Scraper
-
-### Adding a New City
-
-1.  Find the Oikotie search URL for the desired city (e.g., Vantaa).
-2.  Open `config.json`.
-3.  Add a new JSON object to the `tasks` list for the new city.
-4.  Set `"enabled": true`.
-
-    **Example for Vantaa:**
-    ```json
-    {
-      "city": "Vantaa",
-      "enabled": true,
-      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B50,6,%22Vantaa%22%5D%5D&cardType=100"
-    }
+1.  **Start the Marimo server**:
+    Once the scraper is finished, you can start the interactive notebook to view the results.
+    ```sh
+    marimo run test.py
     ```
 
-### Adding a New Website (e.g., Etuovi.com)
+2.  **Open the Notebook**:
+    Marimo will provide a URL in your terminal (e.g., `http://localhost:2718`). Open this in your browser.
 
-The scraper is designed to be modular. To add a new website, you would need to:
-1.  Add a new task for it in `config.json`.
-2.  Update the `detect_site_type` method in `scraper.py` to recognize the new site's URL.
-3.  Create new parsing methods specific to the new site's HTML structure (e.g., `_extract_etuovi_summaries`, `_parse_etuovi_details_page`).
-4.  Update the main `run` method to call the appropriate functions based on the detected site type.
+3.  **Explore the Data**:
+    - The notebook will connect to the `real_estate.duckdb` file.
+    - You will see cells displaying the first 10 rows, the top 10 most expensive listings, and a map.
+    - The map cell will geocode addresses in real-time, which will take about **1 second per listing** due to rate limiting. Please be patient while it runs.
 
-## Main Dependencies
+## Troubleshooting
 
--   **Selenium**: For browser automation and interacting with JavaScript-heavy pages.
--   **BeautifulSoup4**: For parsing HTML and extracting data.
--   **Loguru**: For powerful and easy-to-use logging.
--   **uv**: For creating the virtual environment and managing dependencies.
+> **Error:** `duckdb.duckdb.IOException: IO Error: Cannot open file... because it is being used by another process.`
 
----
+This is the most common error. It means another program (almost certainly the Marimo notebook) has the database file open.
 
-This project is intended for educational purposes. Please be responsible and respect the terms of service of the websites you scrape.
+**Solution**: Stop the Marimo server (`Ctrl + C`) and then re-run the `scraper.py` script.
