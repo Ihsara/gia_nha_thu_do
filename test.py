@@ -1,34 +1,33 @@
 import marimo
 
-__generated_with = "0.7.1"
+__generated_with = "0.14.9"
 app = marimo.App(width="full")
 
 
 @app.cell
-def __():
+def _():
+    # --- Cell 1: Imports and Setup ---
     import marimo as mo
     import duckdb
     import pandas as pd
     import json
+    import numpy as np
     import re
     import time
     from pathlib import Path
     from geopy.geocoders import Nominatim
     import folium
-    from folium.plugins import HeatMap
+    from scipy.spatial import Voronoi
+    import branca.colormap as cm
 
-    # --- Initial Setup ---
-    # Configure pandas for better display
     pd.set_option('display.max_rows', 100)
-    pd.set_option('display.max_columns', 50)
-    
-    # --- Database Connection ---
+    geolocator = Nominatim(user_agent="oikotie_dashboard_voronoi/1.4")
     db_path = 'output/real_estate.duckdb'
     db_connected = False
     table_exists = False
     con = None
     db_error = None
-    
+
     try:
         con = duckdb.connect(database=str(db_path), read_only=True)
         db_connected = True
@@ -37,181 +36,206 @@ def __():
             table_exists = True
         except duckdb.CatalogException:
             table_exists = False
+            db_error = "Table 'listings' not found."
     except Exception as e:
         db_error = e
-    
-    # --- Geocoder Setup ---
-    geolocator = Nominatim(user_agent="oikotie_dashboard_v2/1.0")
-    
-    # --- Helper function to extract postal code ---
-    def extract_postal_code(address):
-        if not isinstance(address, str):
-            return None
-        match = re.search(r'\b(\d{5})\b', address)
-        return match.group(1) if match else None
 
     return (
-        con, db_connected, db_path, mo, pd, table_exists, db_error, json,
-        re, time, geolocator, folium, HeatMap, Path, extract_postal_code
+        Path, cm, con, db_connected, db_error, db_path, folium, geolocator,
+        json, mo, np, pd, re, table_exists, time, Voronoi
     )
 
 
 @app.cell
-def __(con, db_connected, mo, pd, table_exists, extract_postal_code):
-    # --- Cell 2: Load and Process Data ---
-    mo.md("### Data Loading and Pre-processing")
+def _(db_connected, db_error, db_path, mo, table_exists):
+    # --- Cell 2: Connection Status ---
+    if not db_connected:
+        return mo.md(f"## ❌ Database Connection Failed\nCould not connect to `{db_path}`.\n**Error:** `{db_error}`")
+    elif not table_exists:
+        return mo.md(f"## ⚠️ Table Not Found\nSuccessfully connected to `{db_path}`, but the `listings` table is missing. Please run the scraper first.")
+    else:
+        return mo.md(f"## ✅ Database Connected Successfully\nConnected to `{db_path}`.")
+
+
+@app.cell
+def _(con, db_connected, pd, re, table_exists):
+    # --- Cell 3: Load and Process Data ---
     if db_connected and table_exists:
-        # Load the entire relevant dataset into pandas
         df = con.execute("""
             SELECT 
-                city, 
-                address, 
-                listing_type, 
-                price_eur 
+                city, address, listing_type, price_eur, size_m2,
+                (price_eur / NULLIF(size_m2, 0)) as price_eur_per_m2
             FROM listings 
-            WHERE city = 'Helsinki' AND address IS NOT NULL AND price_eur IS NOT NULL
+            WHERE 
+                city = 'Helsinki' AND address IS NOT NULL AND 
+                price_eur IS NOT NULL AND size_m2 > 0
         """).fetchdf()
-        
-        # Create the postal_code column
+
+        from oikotie.utils import extract_postal_code
+
         df['postal_code'] = df['address'].apply(extract_postal_code)
-        
-        # Clean data by removing rows where postal code or listing type is missing
-        df.dropna(subset=['postal_code', 'listing_type'], inplace=True)
-        
-        # Display a success message
-        mo.md(f"Successfully loaded and processed **{len(df)}** listings from Helsinki.")
+        df.dropna(subset=['postal_code', 'listing_type', 'price_eur_per_m2'], inplace=True)
     else:
-        df = pd.DataFrame() # Create empty dataframe if DB is not ready
-        mo.md("Database not ready. Cannot load data.")
-    return df,
+        df = pd.DataFrame()
+    return df, extract_postal_code
 
 
 @app.cell
-def __(df, mo):
-    # --- Cell 3: Dashboard Header with Key Stats ---
-    total_listings = len(df)
-    unique_postal_codes = df['postal_code'].nunique()
-    
-    mo.md(
-        f"""
-        # Helsinki Real Estate Dashboard
-        ---
-        """
-    )
-    
-    # Display stats in a horizontal layout
-    mo.hstack([
-        mo.stat(value=f"{total_listings:,}", label="Total Listings Analyzed"),
-        mo.stat(value=unique_postal_codes, label="Unique Postal Codes")
-    ], justify='start')
-    return total_listings, unique_postal_codes
+def _(mo):
+    # --- Cell 4: Dashboard Title ---
+    return mo.md(r"""# Helsinki Real Estate Dashboard""")
 
 
 @app.cell
-def __(df, mo):
-    # --- Cell 4: Postal Code Analysis Table ---
-    mo.md("## Analysis by Postal Code and Housing Type")
+def _(df, mo):
+    # --- Cell 5: KPI Cards ---
     if not df.empty:
-        # Group by postal code and listing type, then aggregate
+        total_listings = len(df)
+        avg_price = df['price_eur'].mean()
+        avg_price_per_m2 = df['price_eur_per_m2'].mean()
+        median_price = df['price_eur'].median()
+
+        return mo.ui.grid(
+            [
+                mo.stat(label="Total Listings", value=f"{total_listings:,}"),
+                mo.stat(label="Avg. Price", value=f"€{avg_price:,.0f}"),
+                mo.stat(label="Avg. Price / m²", value=f"€{avg_price_per_m2:,.0f}"),
+                mo.stat(label="Median Price", value=f"€{median_price:,.0f}"),
+            ]
+        )
+    else:
+        return mo.md("### No data to display KPIs. Run the scraper.")
+
+
+@app.cell
+def _(mo):
+    # --- Cell 6: Analysis by Postal Code and Housing Type ---
+    return mo.md(r"""## Analysis by Postal Code and Housing Type
+    This table shows the number of listings, average price, and average price per square meter
+    for each postal code and housing type combination.
+    """)
+
+
+@app.cell
+def _(df, mo):
+    # --- Cell 7: Data Table ---
+    if not df.empty:
         analysis_df = df.groupby(['postal_code', 'listing_type']).agg(
-            listing_count=('price_eur', 'count'),
-            average_price_eur=('price_eur', 'mean')
+            num_listings=('price_eur', 'size'),
+            avg_price_eur=('price_eur', 'mean'),
+            avg_price_per_m2=('price_eur_per_m2', 'mean')
         ).reset_index()
 
-        # Format for better readability
-        analysis_df['average_price_eur'] = analysis_df['average_price_eur'].round(0).astype(int)
-        analysis_df = analysis_df.sort_values(by=['postal_code', 'listing_count'], ascending=[True, False])
-        
-        mo.ui.table(analysis_df, page_size=15, label="Listings and Average Price")
-    else:
-        mo.md("No data available to create analysis table.")
-    return analysis_df,
+        analysis_df.sort_values(by=['postal_code', 'num_listings'], ascending=[True, False], inplace=True)
+
+        return mo.ui.table(
+            analysis_df,
+            pagination=True,
+            page_size=10,
+            label="Aggregated Listing Data"
+        )
+    return
 
 
 @app.cell
-def __(
-    Path, df, folium, geolocator, HeatMap, json, mo, time
-):
-    # --- Cell 5: Heatmap Visualization ---
-    mo.md("## Listing Density Heatmap by Postal Code")
+def _(mo):
+    # --- Cell 8: Map Title ---
+    return mo.md(r"""## Postal Code Boundaries and Price Analysis (Voronoi)
+    This map visualizes the average price per square meter (€/m²) for each postal code area in Helsinki.
+    The boundaries are estimated using a Voronoi diagram based on the geographical center of each postal code.
+    Darker colors indicate a higher average price per square meter.
+    """)
 
-    # --- Geocoding with Caching ---
-    CACHE_FILE = Path("postal_code_coords.json")
-    
-    def load_geocode_cache():
-        if CACHE_FILE.exists():
-            with open(CACHE_FILE, 'r') as f:
-                return json.load(f)
-        return {}
 
-    def save_geocode_cache(cache):
-        with open(CACHE_FILE, 'w') as f:
-            json.dump(cache, f, indent=2)
-
-    def get_coords_for_postal_code(postal_code, cache):
-        if postal_code in cache:
-            return cache[postal_code]
-        
-        try:
-            # Respect Nominatim's rate limit of 1 request/sec
-            time.sleep(1.1) 
-            # Query for the postal code in Finland for better accuracy
-            location = geolocator.geocode(f"{postal_code}, Finland")
-            if location:
-                coords = {'lat': location.latitude, 'lon': location.longitude}
-                cache[postal_code] = coords
-                return coords
-            return None
-        except Exception as e:
-            logger.error(f"Error geocoding {postal_code}: {e}")
-            return None
+@app.cell
+def _(Path, cm, df, folium, geolocator, json, mo, np, time, Voronoi):
+    # --- Cell 9: Voronoi Map ---
+    CACHE_FILE = Path('postal_code_coords.json')
+    if CACHE_FILE.exists():
+        with open(CACHE_FILE, 'r') as f:
+            postal_code_coords = json.load(f)
+    else:
+        postal_code_coords = {}
 
     if not df.empty:
-        # Get listing counts per postal code
-        postal_code_counts = df['postal_code'].value_counts().reset_index()
-        postal_code_counts.columns = ['postal_code', 'count']
-        
-        # Geocode all unique postal codes
-        geocode_cache = load_geocode_cache()
-        
-        mo.md(f"Geocoding {postal_code_counts['postal_code'].nunique()} postal codes... (This may take a while for new codes)")
-        
-        coordinates = [get_coords_for_postal_code(pc, geocode_cache) for pc in postal_code_counts['postal_code']]
-        
-        save_geocode_cache(geocode_cache) # Save any new results
-        
-        postal_code_counts['coords'] = coordinates
-        postal_code_counts.dropna(subset=['coords'], inplace=True)
+        unique_postal_codes = df['postal_code'].unique()
+        new_codes_found = False
+        # Create a status area for geocoding updates
+        status = mo.output.replace(mo.md("Checking for new postal codes..."))
+        for code in unique_postal_codes:
+            if code not in postal_code_coords:
+                if not new_codes_found: # First new code
+                    status.append(mo.md("Geocoding new postal codes (this may take a moment)..."))
+                new_codes_found = True
+                status.append(f"Querying: {code}...")
+                try:
+                    location = geolocator.geocode(f"{code}, Helsinki, Finland")
+                    if location:
+                        postal_code_coords[code] = {"lat": location.latitude, "lon": location.longitude}
+                    else:
+                        status.append(f"⚠️ Could not find coordinates for {code}.")
+                    time.sleep(1.1) # Respect Nominatim's usage policy
+                except Exception as e:
+                    status.append(f"❌ Error geocoding {code}: {e}")
 
-        # Prepare data for the heatmap: [latitude, longitude, weight]
-        heat_data = [
-            [row['coords']['lat'], row['coords']['lon'], row['count']]
-            for _, row in postal_code_counts.iterrows()
-        ]
-        
-        if heat_data:
-            # Create the base map centered on Helsinki
-            map_helsinki = folium.Map(location=[60.1699, 24.9384], zoom_start=11)
-            
-            # Add the heatmap layer
-            HeatMap(heat_data, radius=15, blur=10).add_to(map_helsinki)
-            
-            # This is the last expression, ensuring the map is rendered
-            map_helsinki
+        if new_codes_found:
+            with open(CACHE_FILE, 'w') as f:
+                json.dump(postal_code_coords, f, indent=2)
+            status.append("✅ Cache updated.")
         else:
-            mo.md("Could not create heatmap data. No coordinates found.")
+            status.replace(mo.md("All postal codes are cached."))
+
+        map_df = df.groupby('postal_code').agg(
+            avg_price_per_m2=('price_eur_per_m2', 'mean'),
+            num_listings=('price_eur', 'size')
+        ).reset_index()
+
+        map_df['lat'] = map_df['postal_code'].apply(lambda c: postal_code_coords.get(c, {}).get('lat'))
+        map_df['lon'] = map_df['postal_code'].apply(lambda c: postal_code_coords.get(c, {}).get('lon'))
+        map_df.dropna(subset=['lat', 'lon'], inplace=True)
+
+        points = map_df[['lat', 'lon']].values
+        
+        if len(points) > 3:
+            points_center = points.mean(axis=0)
+            bounding_box = np.array([
+                [points_center[0] - 1, points_center[1] - 1], [points_center[0] - 1, points_center[1] + 1],
+                [points_center[0] + 1, points_center[1] + 1], [points_center[0] + 1, points_center[1] - 1]
+            ])
+            all_points = np.vstack([points, bounding_box])
+            vor = Voronoi(all_points)
+
+            m = folium.Map(location=[60.1699, 24.9384], zoom_start=11)
+
+            min_price = map_df['avg_price_per_m2'].min()
+            max_price = map_df['avg_price_per_m2'].max()
+            colormap = cm.LinearColormap(
+                colors=['#ffffcc', '#a1dab4', '#41b6c4', '#2c7fb8', '#253494'],
+                index=np.linspace(min_price, max_price, 5), vmin=min_price, vmax=max_price
+            )
+            colormap.caption = 'Average Price per m² (€)'
+
+            for i, region_index in enumerate(vor.point_region[:len(points)]):
+                region = vor.regions[region_index]
+                if -1 not in region:
+                    polygon = [vor.vertices[j] for j in region]
+                    row = map_df.iloc[i]
+                    price = row['avg_price_per_m2']
+                    
+                    folium.Polygon(
+                        locations=polygon, color='black', weight=1, fill_color=colormap(price),
+                        fill_opacity=0.7,
+                        tooltip=f"<b>Postal Code: {row['postal_code']}</b><br>"
+                                f"Avg. Price/m²: €{price:,.0f}<br>"
+                                f"Listings: {row['num_listings']}"
+                    ).add_to(m)
+            
+            m.add_child(colormap)
+            return m, status
+        else:
+            return mo.md("### Not enough data points to generate a Voronoi map (need at least 4)."), status
     else:
-        mo.md("No data available to create heatmap.")
-    return (
-        CACHE_FILE,
-        geocode_address,
-        geocode_cache,
-        heat_data,
-        load_geocode_cache,
-        map_helsinki,
-        postal_code_counts,
-        save_geocode_cache,
-    )
+        return mo.md("### No data available to generate map.")
 
 
 if __name__ == "__main__":

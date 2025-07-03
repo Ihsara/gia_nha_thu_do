@@ -57,9 +57,19 @@ class DatabaseManager:
     def _clean_and_convert(self, value_str, target_type):
         if not value_str: return None
         try:
-            cleaned_str = value_str.split(' ')[0].replace('\u00a0', '').replace(',', '.').strip()
-            return float(cleaned_str) if target_type == 'float' else int(float(cleaned_str))
-        except (ValueError, TypeError): return None
+            # Remove thousands separators, then find the first number
+            cleaned_str = value_str.replace('\u00a0', '').replace(' ', '')
+            # Find the first sequence of digits, possibly with a decimal comma/dot
+            match = re.search(r'[\d,.]+', cleaned_str)
+            if not match:
+                return None
+            
+            # Convert comma to dot for float conversion
+            num_str = match.group(0).replace(',', '.')
+            
+            return float(num_str) if target_type == 'float' else int(float(num_str))
+        except (ValueError, TypeError):
+            return None
 
     def save_listings(self, listings, city_name):
         if not listings:
@@ -283,6 +293,9 @@ class ScraperOrchestrator:
                 logger.info(f"--- Task for city: {city} finished ---")
 
 
-if __name__ == "__main__":
+def main():
     orchestrator = ScraperOrchestrator()
     orchestrator.run()
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,28 @@
+Metadata-Version: 2.4
+Name: oikotie
+Version: 0.1.0
+Summary: A web scraper and data analysis dashboard for Oikotie.fi.
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: beautifulsoup4>=4.12.3
+Requires-Dist: duckdb>=0.10.0
+Requires-Dist: loguru>=0.7.2
+Requires-Dist: pandas>=2.2.0
+Requires-Dist: selenium>=4.18.0
+Requires-Dist: marimo>=0.4.3
+Requires-Dist: geopy>=2.4.1
+Requires-Dist: folium>=0.15.1
+Requires-Dist: scipy>=1.12.0
+Requires-Dist: branca>=0.7.1
+Provides-Extra: test
+Requires-Dist: pytest>=8.0.0; extra == "test"
+Requires-Dist: pytest-mock>=3.12.0; extra == "test"
+Dynamic: license-file
+
 
 ## Part 1: Setting Up and Running the Scraper
 
