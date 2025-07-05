@@ -6,9 +6,11 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 
 -   `config/`: Contains configuration files.
     -   `config.json`: The main configuration file for the scraper.
--   `data/`: (Ignored by git) Contains the raw and processed data, including the main `real_estate.duckdb` database.
+-   `data/`: (Ignored by git) Contains the raw and processed data, including the main `real_estate.duckdb` database and open data from the National Land Survey of Finland.
 -   `docs/`: Project documentation.
 -   `notebooks/`: Jupyter notebooks for data analysis and visualization.
+    -   `check_data.ipynb`: For data visualization and quality checks of the scraped data.
+    -   `explore_open_data.ipynb`: For exploring geospatial data from the National Land Survey of Finland.
 -   `oikotie/`: The main Python package containing all source code.
 -   `output/`: (Ignored by git) For generated outputs like reports or images (currently unused).
 -   `tests/`: Unit and integration tests.
@@ -27,10 +29,15 @@ The entire data pipeline is managed by a single script.
     c.  **Check Status**: Prints a report on the final state of the database.
 
 2.  **Analyze the Data**:
-    Once the workflow is complete, you can use the Jupyter Notebook to explore the data.
-    ```sh
-    jupyter lab notebooks/check_data.ipynb
-    ```
+    Once the workflow is complete, you can use the Jupyter Notebooks to explore the data.
+    -   To check the scraped data:
+        ```sh
+        jupyter lab notebooks/check_data.ipynb
+        ```
+    -   To explore the open geospatial data:
+        ```sh
+        jupyter lab notebooks/explore_open_data.ipynb
+        ```
 
 ## Setup and Installation
 
