@@ -10,9 +10,11 @@ This project is a Python application designed to scrape housing data from Oikoti
 
 -   **Run the entire data pipeline:** `python run_workflow.py`
 -   **Prepare geospatial data:** `python prepare_geospatial_data.py`
+-   **Prepare topographic data:** `python prepare_topographic_data.py`
 -   **Run the Jupyter dashboard:** `jupyter lab notebooks/check_data.ipynb`
 -   **Explore open data:** `jupyter lab notebooks/explore_open_data.ipynb`
 -   **Visualize Helsinki properties:** `jupyter lab notebooks/visualize_helsinki_properties.ipynb`
+-   **Inspect GML data:** `jupyter lab notebooks/inspect_gml_data.ipynb`
 -   **Run tests:** `pytest`
 -   **Run linter/formatter:** `ruff check . && ruff format .`
 -   **Install/sync dependencies:** `uv sync --all-extras`
@@ -21,17 +23,20 @@ This project is a Python application designed to scrape housing data from Oikoti
 
 1.  The main entry point for data collection is `run_workflow.py`.
 2.  To load and filter the large geospatial data into the database, run `python prepare_geospatial_data.py`.
-3.  After the workflow completes, data can be analyzed in `notebooks/check_data.ipynb`.
-4.  Geospatial data from the National Land Survey of Finland can be explored in `notebooks/explore_open_data.ipynb`.
-5.  The processed Helsinki properties can be visualized in `notebooks/visualize_helsinki_properties.ipynb`.
-6.  The database is located at `data/real_estate.duckdb`.
-7.  External data lookups (like road data) are currently disabled.
-8.  Configuration is managed in `config/config.json`.
+3.  To process the topographic data, run `python prepare_topographic_data.py`.
+4.  After the workflow completes, data can be analyzed in `notebooks/check_data.ipynb`.
+5.  Geospatial data from the National Land Survey of Finland can be explored in `notebooks/explore_open_data.ipynb`.
+6.  The processed Helsinki properties can be visualized in `notebooks/visualize_helsinki_properties.ipynb`.
+7.  The GML data can be inspected in `notebooks/inspect_gml_data.ipynb`.
+8.  The database is located at `data/real_estate.duckdb`.
+9.  External data lookups (like road data) are currently disabled.
+10. Configuration is managed in `config/config.json`.
 
 ## Key Components
 
 -   `run_workflow.py`: The main entry point for the data pipeline.
 -   `prepare_geospatial_data.py`: A script to process and load large geospatial data into the database, filtered for Helsinki.
+-   `prepare_topographic_data.py`: A script to process the topographic data from the `L4134C.zip` file.
 -   `oikotie/scraper.py`: Handles scraping data from Oikotie.fi and saving it to the database.
 -   `oikotie/geolocation.py`: Handles parallel geocoding of addresses and postal codes.
 -   `prepare_locations.py`: Executes the geocoding process.
@@ -40,6 +45,7 @@ This project is a Python application designed to scrape housing data from Oikoti
     -   `check_data.ipynb`: For data visualization and quality checks.
     -   `explore_open_data.ipynb`: For exploring geospatial data from the National Land Survey of Finland.
     -   `visualize_helsinki_properties.ipynb`: For visualizing the processed Helsinki properties.
+    -   `inspect_gml_data.ipynb`: For inspecting the GML data from the `L4134C.zip` file.
 -   `config/`: Contains configuration files.
     -   `config.json`: The main configuration file for the scraper.
 -   `data/`: (Ignored by git) Contains the DuckDB database and other data files.
