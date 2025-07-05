@@ -6,6 +6,7 @@ import os
 import tempfile
 import shutil
 from loguru import logger
+import fiona
 
 # --- Configuration ---
 DB_PATH = 'data/real_estate.duckdb'
@@ -28,33 +29,33 @@ def get_helsinki_boundary():
         with zipfile.ZipFile(MUNICIPALITY_ZIP_PATH, 'r') as zip_ref:
             zip_ref.extractall(temp_dir)
         
-        # Find the shapefile in the extracted contents
-        shapefile_path = None
+        # Find the GeoPackage file in the extracted contents
+        gpkg_path = None
         for root, _, files in os.walk(temp_dir):
             for file in files:
-                if file.endswith('.shp'):
-                    shapefile_path = os.path.join(root, file)
+                if file.endswith('.gpkg'):
+                    gpkg_path = os.path.join(root, file)
                     break
-            if shapefile_path:
+            if gpkg_path:
                 break
 
-        if not shapefile_path:
-            raise FileNotFoundError("Could not find a shapefile in the extracted archive.")
+        if not gpkg_path:
+            raise FileNotFoundError("Could not find a GeoPackage file in the extracted archive.")
 
-        logger.info(f"Reading municipal boundaries from {shapefile_path}...")
-        municipalities = gpd.read_file(shapefile_path)
+        logger.info(f"Reading municipal boundaries from {gpkg_path}...")
+        municipalities = gpd.read_file(gpkg_path, layer='Kunta')
         
         # Find the Helsinki polygon
-        helsinki = municipalities[municipalities['NimiSuomi'] == HELSINKI_MUNICIPALITY_NAME]
+        helsinki = municipalities[municipalities['namefin'] == HELSINKI_MUNICIPALITY_NAME]
         if helsinki.empty:
             raise ValueError(f"Could not find municipality: {HELSINKI_MUNICIPALITY_NAME}")
             
         logger.success(f"Successfully extracted the boundary for {HELSINKI_MUNICIPALITY_NAME}.")
-        return helsinki.geometry.unary_union
+        return helsinki.geometry.union_all()
 
 def process_and_load_data(helsinki_boundary):
     """
-    Reads the properties GeoPackage in chunks, filters for Helsinki,
+    Reads the properties GeoPackage, filters for Helsinki,
     and loads the data into DuckDB.
     """
     logger.info(f"Starting to process properties from {PROPERTIES_GPKG_PATH}...")
@@ -65,38 +66,35 @@ def process_and_load_data(helsinki_boundary):
             con.execute(f"DROP TABLE IF EXISTS {PROPERTIES_TABLE_NAME};")
             logger.info(f"Dropped existing table '{PROPERTIES_TABLE_NAME}' if it existed.")
 
-            is_first_chunk = True
-            total_rows_written = 0
-
-            # Assuming the layer name is 'kiinteistorekisterikartta'
-            # This might need adjustment if the layer name is different
-            layer_name = 'kiinteistorekisterikartta' 
+            # List layers and use the first one
+            layers = fiona.listlayers(PROPERTIES_GPKG_PATH)
+            if not layers:
+                raise ValueError(f"No layers found in {PROPERTIES_GPKG_PATH}")
+            layer_name = layers[0]
+            logger.info(f"Using layer '{layer_name}' from {PROPERTIES_GPKG_PATH}")
             
-            for chunk in gpd.read_file(PROPERTIES_GPKG_PATH, layer=layer_name, chunksize=CHUNK_SIZE):
-                logger.info(f"Processing a chunk of {len(chunk)} properties...")
+            logger.info("Reading the entire GeoPackage file. This may take some time...")
+            gdf = gpd.read_file(PROPERTIES_GPKG_PATH, layer=layer_name)
+            
+            logger.info(f"Filtering {len(gdf)} properties for Helsinki...")
+            helsinki_properties = gdf[gdf.within(helsinki_boundary)]
+            
+            if not helsinki_properties.empty:
+                logger.info(f"Found {len(helsinki_properties)} properties within Helsinki.")
                 
-                # Filter properties within the Helsinki boundary
-                helsinki_properties = chunk[chunk.within(helsinki_boundary)]
+                # Convert geometry to WKT for storing in DuckDB
+                helsinki_properties['geometry_wkt'] = helsinki_properties['geometry'].apply(lambda geom: geom.wkt)
+                df_to_insert = pd.DataFrame(helsinki_properties.drop(columns=['geometry']))
                 
-                if not helsinki_properties.empty:
-                    logger.info(f"Found {len(helsinki_properties)} properties within Helsinki in this chunk.")
-                    
-                    # Convert GeoDataFrame to DataFrame for DuckDB insertion
-                    df_to_insert = pd.DataFrame(helsinki_properties.drop(columns='geometry'))
-                    
-                    if is_first_chunk:
-                        # Create the table with the schema of the first chunk
-                        con.execute(f"CREATE TABLE {PROPERTIES_TABLE_NAME} AS SELECT * FROM df_to_insert;")
-                        is_first_chunk = False
-                    else:
-                        # Append to the existing table
-                        con.execute(f"INSERT INTO {PROPERTIES_TABLE_NAME} SELECT * FROM df_to_insert;")
-                    
-                    total_rows_written += len(df_to_insert)
-                    logger.info(f"Wrote {len(df_to_insert)} rows to the database. Total written: {total_rows_written}")
+                # Create the table with the schema of the first chunk
+                con.execute(f"CREATE TABLE {PROPERTIES_TABLE_NAME} AS SELECT * FROM df_to_insert;")
+                logger.success(f"Finished processing. A total of {len(df_to_insert)} properties were loaded into the '{PROPERTIES_TABLE_NAME}' table.")
+            else:
+                logger.warning("No properties found within the Helsinki boundary.")
 
-            logger.success(f"Finished processing. A total of {total_rows_written} properties were loaded into the '{PROPERTIES_TABLE_NAME}' table.")
-
+    except fiona.errors.DriverError as e:
+        logger.critical(f"A Fiona driver error occurred: {e}. This might be due to an unsupported file format or a missing driver.")
+        raise
     except Exception as e:
         logger.critical(f"An error occurred during data processing and loading: {e}")
         raise

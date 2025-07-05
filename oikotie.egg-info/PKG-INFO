@@ -18,6 +18,7 @@ Requires-Dist: folium>=0.15.1
 Requires-Dist: scipy>=1.12.0
 Requires-Dist: branca>=0.7.1
 Requires-Dist: geopandas>=0.14.4
+Requires-Dist: fiona>=1.9.6
 Provides-Extra: test
 Requires-Dist: pytest>=8.0.0; extra == "test"
 Requires-Dist: pytest-mock>=3.12.0; extra == "test"
@@ -25,58 +26,61 @@ Dynamic: license-file
 
 # Oikotie Scraper and Dashboard
 
-This project scrapes real estate data from Oikotie.fi and provides an interactive dashboard to visualize the collected data.
+This project scrapes real estate data from Oikotie.fi, prepares it for analysis, and provides a dashboard for visualization.
+
+## Project Structure
+
+-   `config/`: Contains configuration files.
+    -   `config.json`: The main configuration file for the scraper.
+-   `data/`: (Ignored by git) Contains the raw and processed data, including the main `real_estate.duckdb` database and open data from the National Land Survey of Finland.
+-   `docs/`: Project documentation.
+-   `notebooks/`: Jupyter notebooks for data analysis and visualization.
+    -   `check_data.ipynb`: For data visualization and quality checks of the scraped data.
+    -   `explore_open_data.ipynb`: For exploring geospatial data from the National Land Survey of Finland.
+-   `oikotie/`: The main Python package containing all source code.
+-   `output/`: (Ignored by git) For generated outputs like reports or images (currently unused).
+-   `tests/`: Unit and integration tests.
+-   `prepare_geospatial_data.py`: A script to process and load large geospatial data into the database, filtered for Helsinki.
+
+## Workflow
+
+The entire data pipeline is managed by a single script.
+
+1.  **Prepare Geospatial Data (One-time setup)**:
+    Before running the main workflow, you need to load the large geospatial data into the database. This only needs to be done once.
+    ```sh
+    python prepare_geospatial_data.py
+    ```
+
+2.  **Run the full workflow**:
+    ```sh
+    python run_workflow.py
+    ```
+    This script executes the following steps in order:
+    a.  **Scrape Data**: Fetches the latest listings from Oikotie.fi.
+    b.  **Prepare Locations**: Geocodes any new addresses or postal codes.
+    c.  **Check Status**: Prints a report on the final state of the database.
+
+3.  **Analyze the Data**:
+    Once the workflow is complete, you can use the Jupyter Notebooks to explore the data.
+    -   To check the scraped data:
+        ```sh
+        jupyter lab notebooks/check_data.ipynb
+        ```
+    -   To explore the open geospatial data:
+        ```sh
+        jupyter lab notebooks/explore_open_data.ipynb
+        ```
 
 ## Setup and Installation
 
-**Prerequisites:**
--   Python 3.9+
--   `uv` installed. If you don't have it: `pip install uv`.
-
-**Installation Steps:**
-
-1.  **Clone the repository and navigate into it.**
+1.  **Clone the repository.**
 2.  **Create and activate a virtual environment:**
     ```sh
     uv venv
-    source .venv/bin/activate  # On macOS/Linux
-    # .venv\Scripts\activate  # On Windows
+    source .venv/bin/activate
     ```
 3.  **Install dependencies:**
     ```sh
     uv sync --all-extras
     ```
-
-## Data Preparation (One-Time Setup)
-
-Before running the main workflow, you need to prepare the road network data.
-
-1.  **Download and prepare road data**:
-    ```sh
-    python prepare_road_data.py
-    ```
-    This script will download the road network data for the Helsinki region and store it in the database. This only needs to be run once.
-
-## Daily Workflow
-
-The project is designed to be run in a sequence. A wrapper script is provided to execute the entire daily workflow.
-
-1.  **Run the full workflow**:
-    ```sh
-    python run_workflow.py
-    ```
-    This script will:
-    a.  Scrape the latest listings from Oikotie.fi.
-    b.  Update the database with new and changed listings, and mark removed listings as deleted.
-    c.  Geocode any new addresses or postal codes to prepare for mapping.
-    d.  Provide a status check of the database.
-
-2.  **Analyze the Data**:
-    Once the workflow is complete, you can use the Jupyter Notebook to explore the data.
-    ```sh
-    jupyter lab notebooks/dashboard.ipynb
-    ```
-
-## Automation
-
-You can schedule the `run_workflow.py` script to run automatically. See the "Automation" section in `docs/DASHBOARD.md` for instructions on how to set this up for your operating system.
