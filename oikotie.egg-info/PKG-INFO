@@ -13,108 +13,70 @@ Requires-Dist: duckdb>=0.10.0
 Requires-Dist: loguru>=0.7.2
 Requires-Dist: pandas>=2.2.0
 Requires-Dist: selenium>=4.18.0
-Requires-Dist: marimo>=0.4.3
 Requires-Dist: geopy>=2.4.1
 Requires-Dist: folium>=0.15.1
 Requires-Dist: scipy>=1.12.0
 Requires-Dist: branca>=0.7.1
+Requires-Dist: geopandas>=0.14.4
 Provides-Extra: test
 Requires-Dist: pytest>=8.0.0; extra == "test"
 Requires-Dist: pytest-mock>=3.12.0; extra == "test"
 Dynamic: license-file
 
+# Oikotie Scraper and Dashboard
 
-## Part 1: Setting Up and Running the Scraper
+This project scrapes real estate data from Oikotie.fi and provides an interactive dashboard to visualize the collected data.
 
-This phase focuses on collecting the data from the web.
-
-### 1.1. Setup and Installation
+## Setup and Installation
 
 **Prerequisites:**
--   Python 3.8+
--   Google Chrome browser installed.
+-   Python 3.9+
 -   `uv` installed. If you don't have it: `pip install uv`.
 
 **Installation Steps:**
 
-1.  **Clone the repository:**
-    ```sh
-    git clone <your-repo-url>
-    cd <your-repo-name>
-    ```
-
+1.  **Clone the repository and navigate into it.**
 2.  **Create and activate a virtual environment:**
     ```sh
     uv venv
     source .venv/bin/activate  # On macOS/Linux
     # .venv\Scripts\activate  # On Windows
     ```
-
-3.  **Install all dependencies:**
-    This reads `pyproject.toml` and installs all necessary packages for both scraping and analysis.
+3.  **Install dependencies:**
     ```sh
-    uv pip install -e .
+    uv sync --all-extras
     ```
 
-### 1.2. Running the Scraper
+## Data Preparation (One-Time Setup)
 
-1.  **Configure `config.json`**:
-    Open the file to define your scraping tasks.
-    ```json
-    {
-      "tasks": [
-        {
-          "city": "Helsinki",
-          "enabled": true,
-          "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
-          "listing_limit": 50,
-          "max_detail_workers": 5
-        }
-      ]
-    }
-    ```
-    -   `"enabled"`: `true` to run the task, `false` to skip.
-    -   `"listing_limit"` (Optional): Limits the number of listings to scrape. **Recommended for testing.** If omitted, the scraper will fetch all listings from all pages.
-    -   `"max_detail_workers"` (Optional): Sets the number of parallel browser instances for scraping details. A good starting value is 4-8, depending on your system's RAM and CPU.
+Before running the main workflow, you need to prepare the road network data.
 
-2.  **Execute the scraper script**:
-    > ⚠️ **Important**: Ensure no other process (like the Marimo notebook) is connected to the database file before running the scraper.
+1.  **Download and prepare road data**:
     ```sh
-    python scraper.py
+    python prepare_road_data.py
     ```
-    Wait for the process to complete. The data will be saved to `output/real_estate.duckdb`.
+    This script will download the road network data for the Helsinki region and store it in the database. This only needs to be run once.
 
----
+## Daily Workflow
 
-## Part 2: Analyzing Data with the Marimo Dashboard
+The project is designed to be run in a sequence. A wrapper script is provided to execute the entire daily workflow.
 
-This phase focuses on exploring the data you've collected.
-
-### 2.1. Running the Dashboard
-
-1.  **Start the Marimo server**:
-    Once the scraper has finished, you can launch the interactive dashboard.
+1.  **Run the full workflow**:
     ```sh
-    marimo run test.py
+    python run_workflow.py
+    ```
+    This script will:
+    a.  Scrape the latest listings from Oikotie.fi.
+    b.  Update the database with new and changed listings, and mark removed listings as deleted.
+    c.  Geocode any new addresses or postal codes to prepare for mapping.
+    d.  Provide a status check of the database.
+
+2.  **Analyze the Data**:
+    Once the workflow is complete, you can use the Jupyter Notebook to explore the data.
+    ```sh
+    jupyter lab notebooks/dashboard.ipynb
     ```
 
-2.  **Open the Notebook in Your Browser**:
-    Marimo will provide a URL in your terminal (e.g., `http://localhost:2718`). Open this link.
+## Automation
 
-### 2.2. Understanding the Dashboard
-
-The dashboard (`test.py`) provides several interactive cells:
-
--   **KPI Cards**: Shows high-level statistics, such as the total number of listings analyzed.
--   **Analysis by Postal Code**: An interactive table that groups listings by postal code and housing type, showing the number of listings and the average price for each group.
--   **Listing Density Heatmap**: A map of Helsinki with an OpenStreetMap background. It displays a heatmap where hotter areas indicate a higher concentration of scraped listings in that postal code.
-
-**Note on Geocoding:** The first time you run the heatmap cell, it will use the `geopy` library to fetch coordinates for each postal code. To respect the API's terms of service, there is a **1.1-second delay** for each new postal code. This process can be slow initially, but the results are **cached locally in `postal_code_coords.json`**, making subsequent runs much faster.
-
-## Troubleshooting
-
-> **Error:** `duckdb.duckdb.IOException: IO Error: Cannot open file... because it is being used by another process.`
-
-This is the most common error. It means another program (almost certainly the Marimo notebook) has the database file open, preventing the scraper from writing to it.
-
-**Solution**: Stop the Marimo server (press `Ctrl + C` in its terminal) and then re-run `scraper.py`. The correct workflow is always to **scrape first, then analyze**.
+You can schedule the `run_workflow.py` script to run automatically. See the "Automation" section in `docs/DASHBOARD.md` for instructions on how to set this up for your operating system.

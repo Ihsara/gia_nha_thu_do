@@ -2,7 +2,10 @@ LICENSE
 README.md
 pyproject.toml
 oikotie/__init__.py
+oikotie/geolocation.py
+oikotie/road_data.py
 oikotie/scraper.py
+oikotie/utils.py
 oikotie.egg-info/PKG-INFO
 oikotie.egg-info/SOURCES.txt
 oikotie.egg-info/dependency_links.txt
@@ -10,4 +13,5 @@ oikotie.egg-info/entry_points.txt
 oikotie.egg-info/requires.txt
 oikotie.egg-info/top_level.txt
 tests/test_dashboard.py
+tests/test_geolocation.py
 tests/test_scraper.py
