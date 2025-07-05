@@ -14,12 +14,19 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 -   `oikotie/`: The main Python package containing all source code.
 -   `output/`: (Ignored by git) For generated outputs like reports or images (currently unused).
 -   `tests/`: Unit and integration tests.
+-   `prepare_geospatial_data.py`: A script to process and load large geospatial data into the database, filtered for Helsinki.
 
 ## Workflow
 
 The entire data pipeline is managed by a single script.
 
-1.  **Run the full workflow**:
+1.  **Prepare Geospatial Data (One-time setup)**:
+    Before running the main workflow, you need to load the large geospatial data into the database. This only needs to be done once.
+    ```sh
+    python prepare_geospatial_data.py
+    ```
+
+2.  **Run the full workflow**:
     ```sh
     python run_workflow.py
     ```
@@ -28,7 +35,7 @@ The entire data pipeline is managed by a single script.
     b.  **Prepare Locations**: Geocodes any new addresses or postal codes.
     c.  **Check Status**: Prints a report on the final state of the database.
 
-2.  **Analyze the Data**:
+3.  **Analyze the Data**:
     Once the workflow is complete, you can use the Jupyter Notebooks to explore the data.
     -   To check the scraped data:
         ```sh

@@ -9,6 +9,7 @@ This project is a Python application designed to scrape housing data from Oikoti
 ## Key Commands
 
 -   **Run the entire data pipeline:** `python run_workflow.py`
+-   **Prepare geospatial data:** `python prepare_geospatial_data.py`
 -   **Run the Jupyter dashboard:** `jupyter lab notebooks/check_data.ipynb`
 -   **Explore open data:** `jupyter lab notebooks/explore_open_data.ipynb`
 -   **Run tests:** `pytest`
@@ -18,15 +19,17 @@ This project is a Python application designed to scrape housing data from Oikoti
 ## Development Workflow
 
 1.  The main entry point for data collection is `run_workflow.py`.
-2.  After the workflow completes, data can be analyzed in `notebooks/check_data.ipynb`.
-3.  Geospatial data from the National Land Survey of Finland can be explored in `notebooks/explore_open_data.ipynb`.
-4.  The database is located at `data/real_estate.duckdb`.
-5.  External data lookups (like road data) are currently disabled.
-6.  Configuration is managed in `config/config.json`.
+2.  To load and filter the large geospatial data into the database, run `python prepare_geospatial_data.py`.
+3.  After the workflow completes, data can be analyzed in `notebooks/check_data.ipynb`.
+4.  Geospatial data from the National Land Survey of Finland can be explored in `notebooks/explore_open_data.ipynb`.
+5.  The database is located at `data/real_estate.duckdb`.
+6.  External data lookups (like road data) are currently disabled.
+7.  Configuration is managed in `config/config.json`.
 
 ## Key Components
 
 -   `run_workflow.py`: The main entry point for the data pipeline.
+-   `prepare_geospatial_data.py`: A script to process and load large geospatial data into the database, filtered for Helsinki.
 -   `oikotie/scraper.py`: Handles scraping data from Oikotie.fi and saving it to the database.
 -   `oikotie/geolocation.py`: Handles parallel geocoding of addresses and postal codes.
 -   `prepare_locations.py`: Executes the geocoding process.
