@@ -4,11 +4,13 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 
 ## Project Structure
 
--   `data/`: Contains the raw and processed data, including the main `real_estate.duckdb` database.
+-   `config/`: Contains configuration files.
+    -   `config.json`: The main configuration file for the scraper.
+-   `data/`: (Ignored by git) Contains the raw and processed data, including the main `real_estate.duckdb` database.
 -   `docs/`: Project documentation.
 -   `notebooks/`: Jupyter notebooks for data analysis and visualization.
 -   `oikotie/`: The main Python package containing all source code.
--   `output/`: For generated outputs like reports or images (currently unused).
+-   `output/`: (Ignored by git) For generated outputs like reports or images (currently unused).
 -   `tests/`: Unit and integration tests.
 
 ## Workflow
@@ -27,7 +29,7 @@ The entire data pipeline is managed by a single script.
 2.  **Analyze the Data**:
     Once the workflow is complete, you can use the Jupyter Notebook to explore the data.
     ```sh
-    jupyter lab notebooks/dashboard.ipynb
+    jupyter lab notebooks/check_data.ipynb
     ```
 
 ## Setup and Installation

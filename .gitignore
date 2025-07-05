@@ -126,3 +126,7 @@ cython_debug/
 
 # VSCode
 .vscode/
+
+# Data and output
+data/
+output/

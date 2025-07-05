@@ -20,6 +20,7 @@ This project is a Python application designed to scrape housing data from Oikoti
 2.  After the workflow completes, data can be analyzed in `notebooks/check_data.ipynb`.
 3.  The database is located at `data/real_estate.duckdb`.
 4.  External data lookups (like road data) are currently disabled.
+5.  Configuration is managed in `config/config.json`.
 
 ## Key Components
 
@@ -29,5 +30,7 @@ This project is a Python application designed to scrape housing data from Oikoti
 -   `prepare_locations.py`: Executes the geocoding process.
 -   `check_db_status.py`: Prints a status report of the database.
 -   `notebooks/check_data.ipynb`: The Jupyter Notebook for data visualization.
--   `data/`: Contains the DuckDB database and other data files.
--   `output/`: For generated reports (currently unused).
+-   `config/`: Contains configuration files.
+    -   `config.json`: The main configuration file for the scraper.
+-   `data/`: (Ignored by git) Contains the DuckDB database and other data files.
+-   `output/`: (Ignored by git) For generated reports (currently unused).

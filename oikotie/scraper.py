@@ -359,7 +359,7 @@ def worker_scrape_details(listing_summaries_chunk):
         scraper.close()
     return results
 
-def load_config(config_path='config.json'):
+def load_config(config_path='config/config.json'):
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f).get('tasks', [])
@@ -381,7 +381,7 @@ def worker_scrape_summaries(page_urls_chunk):
 
 class ScraperOrchestrator:
     """Manages the entire scraping workflow for all tasks."""
-    def __init__(self, config_path='config.json'):
+    def __init__(self, config_path='config/config.json'):
         self.tasks = load_config(config_path)
         self.db_manager = DatabaseManager()
 

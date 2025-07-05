@@ -1,0 +1,17 @@
+{
+  "tasks": [
+    {
+      "city": "Helsinki",
+      "enabled": true,
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "max_detail_workers": 5
+    },
+    {
+      "city": "Espoo",
+      "enabled": false,
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B49,6,%22Espoo%22%5D%5D&cardType=100",
+      "listing_limit": 10,
+      "max_detail_workers": 5
+    }
+  ]
+}
