@@ -18,6 +18,7 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 -   `prepare_geospatial_data.py`: A script to process and load large geospatial data into the database, filtered for Helsinki.
 -   `prepare_topographic_data.py`: A script to process the topographic data from the `L4134C.zip` file.
 -   `load_helsinki_data.py`: A script to load Helsinki-specific GeoJSON files into the database.
+-   `visualize_parcels.py`: A script to generate a visualization of a sample of Helsinki parcels.
 
 ## Workflow
 
@@ -51,7 +52,7 @@ The entire data pipeline is managed by a single script.
     c.  **Check Status**: Prints a report on the final state of the database.
 
 5.  **Analyze the Data**:
-    Once the workflow is complete, you can use the Jupyter Notebooks to explore the data.
+    Once the workflow is complete, you can use the Jupyter Notebooks and scripts to explore the data.
     -   To check the scraped data:
         ```sh
         jupyter lab notebooks/check_data.ipynb
@@ -63,6 +64,10 @@ The entire data pipeline is managed by a single script.
     -   To inspect the GML data:
         ```sh
         jupyter lab notebooks/inspect_gml_data.ipynb
+        ```
+    -   To generate a visualization of a sample of Helsinki parcels:
+        ```sh
+        python visualize_parcels.py
         ```
 
 ## Setup and Installation
