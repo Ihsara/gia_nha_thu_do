@@ -19,6 +19,7 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 -   `prepare_topographic_data.py`: A script to process the topographic data from the `L4134C.zip` file.
 -   `load_helsinki_data.py`: A script to load Helsinki-specific GeoJSON files into the database.
 -   `visualize_parcels.py`: A script to generate an interactive map of a sample of Helsinki parcels.
+-   `visualize_buildings.py`: A script to generate an interactive map of a sample of Helsinki buildings.
 
 ## Workflow
 
@@ -68,6 +69,10 @@ The entire data pipeline is managed by a single script.
     -   To generate an interactive map of a sample of Helsinki parcels:
         ```sh
         python visualize_parcels.py
+        ```
+    -   To generate an interactive map of a sample of Helsinki buildings:
+        ```sh
+        python visualize_buildings.py
         ```
 
 ## Setup and Installation
