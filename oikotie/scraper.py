@@ -15,6 +15,7 @@ from loguru import logger
 import duckdb
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import queue
+from oikotie.utils import extract_postal_code
 
 # --- Loguru Configuration ---
 logger.remove()
@@ -32,7 +33,7 @@ def normalize_key(key_text):
 
 class DatabaseManager:
     # This class is robust and does not need changes.
-    def __init__(self, db_path="output/real_estate.duckdb"):
+    def __init__(self, db_path="data/real_estate.duckdb"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         logger.info(f"Database will be stored at: {self.db_path}")
@@ -43,10 +44,24 @@ class DatabaseManager:
             with duckdb.connect(str(self.db_path)) as con:
                 con.execute("""
                     CREATE TABLE IF NOT EXISTS listings (
-                        url VARCHAR PRIMARY KEY, source VARCHAR, city VARCHAR, title VARCHAR,
-                        address VARCHAR, listing_type VARCHAR, price_eur FLOAT, size_m2 FLOAT,
-                        rooms INTEGER, year_built INTEGER, overview VARCHAR, full_description VARCHAR,
-                        other_details_json VARCHAR, scraped_at TIMESTAMP
+                        url VARCHAR PRIMARY KEY, 
+                        source VARCHAR, 
+                        city VARCHAR, 
+                        title VARCHAR,
+                        address VARCHAR, 
+                        postal_code VARCHAR, 
+                        listing_type VARCHAR, 
+                        price_eur FLOAT, 
+                        size_m2 FLOAT,
+                        rooms INTEGER, 
+                        year_built INTEGER, 
+                        overview VARCHAR, 
+                        full_description VARCHAR,
+                        other_details_json VARCHAR, 
+                        scraped_at TIMESTAMP,
+                        insert_ts TIMESTAMP,
+                        updated_ts TIMESTAMP,
+                        deleted_ts TIMESTAMP
                     );
                 """)
             logger.success("Database table 'listings' is ready.")
@@ -57,20 +72,52 @@ class DatabaseManager:
     def _clean_and_convert(self, value_str, target_type):
         if not value_str: return None
         try:
-            cleaned_str = value_str.split(' ')[0].replace('\u00a0', '').replace(',', '.').strip()
-            return float(cleaned_str) if target_type == 'float' else int(float(cleaned_str))
-        except (ValueError, TypeError): return None
+            # Remove thousands separators, then find the first number
+            cleaned_str = value_str.replace('\u00a0', '').replace(' ', '')
+            # Find the first sequence of digits, possibly with a decimal comma/dot
+            match = re.search(r'[\d,.]+', cleaned_str)
+            if not match:
+                return None
+            
+            # Convert comma to dot for float conversion
+            num_str = match.group(0).replace(',', '.')
+            
+            return float(num_str) if target_type == 'float' else int(float(num_str))
+        except (ValueError, TypeError):
+            return None
 
     def save_listings(self, listings, city_name):
         if not listings:
             logger.warning("No listings provided to save.")
             return
-        insert_count = 0
+
         try:
             with duckdb.connect(str(self.db_path)) as con:
+                # Start a transaction
+                con.begin()
+
+                # Get existing URLs for the current city that are not deleted
+                existing_urls_in_db = set(
+                    row[0] for row in con.execute(
+                        "SELECT url FROM listings WHERE city = ? AND deleted_ts IS NULL", [city_name]
+                    ).fetchall()
+                )
+                
+                scraped_urls = set()
+                upsert_count = 0
+
                 for listing in listings:
+                    url = listing.get('url')
+                    if not url:
+                        continue
+                    
+                    scraped_urls.add(url)
                     details = listing.get('details', {})
-                    if not details or 'error' in details: continue
+                    if not details or 'error' in details:
+                        continue
+
+                    address = details.get('sijainti')
+                    postal_code = extract_postal_code(address) if address else None
                     
                     core_data = {
                         'price_eur': self._clean_and_convert(details.get('velaton_hinta') or details.get('myyntihinta'), 'float'),
@@ -80,21 +127,101 @@ class DatabaseManager:
                     }
                     core_keys = ['sijainti', 'rakennuksen_tyyppi', 'velaton_hinta', 'myyntihinta', 'asuinpinta-ala', 'huoneita', 'rakennusvuosi']
                     other_details = {k: v for k, v in details.items() if k not in core_keys}
-
-                    con.execute(
-                        "INSERT OR REPLACE INTO listings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (
-                            listing.get('url'), listing.get('source'), city_name, listing.get('title'),
-                            details.get('sijainti'), details.get('rakennuksen_tyyppi'),
-                            core_data['price_eur'], core_data['size_m2'], core_data['rooms'], core_data['year_built'],
-                            listing.get('overview'), listing.get('full_description'),
-                            json.dumps(other_details, ensure_ascii=False), time.strftime('%Y-%m-%d %H:%M:%S')
-                        )
+                    
+                    params = (
+                        listing.get('source'), city_name, listing.get('title'),
+                        address, postal_code, details.get('rakennuksen_tyyppi'),
+                        core_data['price_eur'], core_data['size_m2'], core_data['rooms'], core_data['year_built'],
+                        listing.get('overview'), listing.get('full_description'),
+                        json.dumps(other_details, ensure_ascii=False), 
+                        time.strftime('%Y-%m-%d %H:%M:%S'), # scraped_at
+                        url
                     )
-                    insert_count += 1
-            logger.success(f"Successfully saved/updated {insert_count} listings for {city_name} in the database.")
+
+                    if url in existing_urls_in_db:
+                        # UPDATE existing record
+                        update_query = """
+                            UPDATE listings 
+                            SET source=?, city=?, title=?, address=?, postal_code=?, listing_type=?, 
+                                price_eur=?, size_m2=?, rooms=?, year_built=?, overview=?, 
+                                full_description=?, other_details_json=?, scraped_at=?,
+                                updated_ts=NOW(), deleted_ts=NULL
+                            WHERE url=?"""
+                        con.execute(update_query, params)
+                    else:
+                        # INSERT new record
+                        insert_query = """
+                            INSERT INTO listings (
+                                source, city, title, address, postal_code, listing_type, 
+                                price_eur, size_m2, rooms, year_built, overview, 
+                                full_description, other_details_json, scraped_at, url, insert_ts
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"""
+                        con.execute(insert_query, params)
+                    
+                    upsert_count += 1
+
+                # Soft delete listings that are no longer on the site
+                urls_to_delete = existing_urls_in_db - scraped_urls
+                if urls_to_delete:
+                    logger.info(f"Marking {len(urls_to_delete)} listings as deleted for city: {city_name}.")
+                    # Use a list of tuples for executemany
+                    delete_params = [(url,) for url in urls_to_delete]
+                    con.executemany("UPDATE listings SET deleted_ts = NOW() WHERE url = ?", delete_params)
+
+                # Commit the transaction
+                con.commit()
+                logger.success(f"Successfully saved/updated {upsert_count} and soft-deleted {len(urls_to_delete)} listings for {city_name}.")
+
+        except duckdb.Error as e:
+            logger.critical(f"A database error occurred: {e}. Rolling back transaction.")
+            if 'con' in locals() and con:
+                con.rollback()
+            self._save_to_fallback_json(listings, city_name)
         except Exception as e:
-            logger.exception(f"Failed to save listings to database: {e}")
+            logger.critical(f"An unexpected error occurred during database operations: {e}")
+            if 'con' in locals() and con:
+                con.rollback()
+            self._save_to_fallback_json(listings, city_name)
+
+    def _save_to_fallback_json(self, listings, city_name):
+        """Saves listings to a JSON file if the database operation fails."""
+        fallback_dir = Path("output/failed_saves")
+        fallback_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        fallback_path = fallback_dir / f"failed_db_save_{city_name}_{timestamp}.json"
+        
+        logger.info(f"Saving {len(listings)} listings to fallback file: {fallback_path}")
+        try:
+            with open(fallback_path, 'w', encoding='utf-8') as f:
+                json.dump(listings, f, ensure_ascii=False, indent=4)
+            logger.success(f"Successfully saved listings to {fallback_path}.")
+        except Exception as e:
+            logger.error(f"Could not write to fallback JSON file: {e}")
+
+    def load_from_json(self, file_path):
+        """Loads listings from a JSON file and saves them to the database."""
+        path = Path(file_path)
+        if not path.exists():
+            logger.error(f"File not found: {file_path}")
+            return
+
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                listings = json.load(f)
+            
+            # Assuming the city can be inferred or is generic
+            # A more robust implementation might store city in the JSON file
+            city_name = "loaded_from_json" 
+            logger.info(f"Loaded {len(listings)} listings from {file_path}. Now saving to database.")
+            self.save_listings(listings, city_name)
+            
+            # Rename the file to avoid reprocessing
+            processed_path = path.with_name(f"{path.stem}_processed.json")
+            path.rename(processed_path)
+            logger.success(f"Successfully processed and renamed {path.name} to {processed_path.name}")
+
+        except (json.JSONDecodeError, Exception) as e:
+            logger.error(f"Failed to load or process JSON file {file_path}: {e}")
 
 
 class OikotieScraper:
@@ -141,25 +268,35 @@ class OikotieScraper:
         logger.info(f"Initiating sequential summary scrape (limit: {limit or 'all'})...")
         self.driver.get(url)
         self._accept_cookies()
+        
         all_summaries = []
         page_num = 1
+        
         while not (limit and len(all_summaries) >= limit):
             logger.info(f"Scraping summary page {page_num}...")
             self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[class*="cards-v2"]')))
-            time.sleep(1) # Gentle pause
-            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
+            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             summaries = self._parse_listing_summaries(soup)
+            
             if not summaries:
-                logger.warning(f"No listings found on page {page_num}. Ending.")
+                logger.warning(f"No new listings found on page {page_num}. Ending scrape.")
                 break
             
             all_summaries.extend(summaries)
-            if not self._go_to_next_page():
-                logger.info("No more pages found.")
+            
+            try:
+                next_button = self.wait.until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Seuraava']]"))
+                )
+                # Use JavaScript to click as a fallback
+                self.driver.execute_script("arguments[0].click();", next_button)
+                page_num += 1
+                time.sleep(random.uniform(1.5, 3.0)) # Wait for next page to load
+            except TimeoutException:
+                logger.info("No 'Next' button found. This is the last page.")
                 break
-            page_num += 1
-            time.sleep(random.uniform(1.0, 2.5))
+        
         return all_summaries[:limit] if limit else all_summaries
 
     def get_single_listing_details(self, listing_summary):
@@ -222,7 +359,7 @@ def worker_scrape_details(listing_summaries_chunk):
         scraper.close()
     return results
 
-def load_config(config_path='config.json'):
+def load_config(config_path='config/config.json'):
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f).get('tasks', [])
@@ -230,9 +367,21 @@ def load_config(config_path='config.json'):
         logger.critical(f"Error loading config file '{config_path}': {e}")
         return []
 
+def worker_scrape_summaries(page_urls_chunk):
+    """Worker target for scraping a chunk of summary pages."""
+    scraper = OikotieScraper(headless=True)
+    results = []
+    try:
+        for page_url in page_urls_chunk:
+            logger.info(f"Summary worker processing: {page_url}")
+            results.extend(scraper._scrape_summary_page(page_url))
+    finally:
+        scraper.close()
+    return results
+
 class ScraperOrchestrator:
     """Manages the entire scraping workflow for all tasks."""
-    def __init__(self, config_path='config.json'):
+    def __init__(self, config_path='config/config.json'):
         self.tasks = load_config(config_path)
         self.db_manager = DatabaseManager()
 
@@ -263,13 +412,12 @@ class ScraperOrchestrator:
                     continue
 
                 # Phase 2: Scrape details in parallel
-                logger.info(f"Distributing {len(listing_summaries)} URLs to {max_workers} workers...")
-                # Chunk the summaries for the workers
-                chunks = [listing_summaries[i::max_workers] for i in range(max_workers)]
+                logger.info(f"Distributing {len(listing_summaries)} URLs to {max_workers} detail workers...")
+                detail_chunks = [listing_summaries[i::max_workers] for i in range(max_workers)]
                 
                 detailed_listings = []
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    futures = [executor.submit(worker_scrape_details, chunk) for chunk in chunks]
+                    futures = [executor.submit(worker_scrape_details, chunk) for chunk in detail_chunks]
                     for future in as_completed(futures):
                         detailed_listings.extend(future.result())
                         logger.info(f"Detail scraping progress: {len(detailed_listings)}/{len(listing_summaries)}")
@@ -283,6 +431,9 @@ class ScraperOrchestrator:
                 logger.info(f"--- Task for city: {city} finished ---")
 
 
-if __name__ == "__main__":
+def main():
     orchestrator = ScraperOrchestrator()
     orchestrator.run()
+
+if __name__ == "__main__":
+    main()
