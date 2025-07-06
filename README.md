@@ -17,6 +17,7 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 -   `tests/`: Unit and integration tests.
 -   `prepare_geospatial_data.py`: A script to process and load large geospatial data into the database, filtered for Helsinki.
 -   `prepare_topographic_data.py`: A script to process the topographic data from the `L4134C.zip` file.
+-   `load_helsinki_data.py`: A script to load Helsinki-specific GeoJSON files into the database.
 
 ## Workflow
 
@@ -34,7 +35,13 @@ The entire data pipeline is managed by a single script.
     python prepare_topographic_data.py
     ```
 
-3.  **Run the full workflow**:
+3.  **Load Helsinki Data (Optional)**:
+    To load the Helsinki-specific GeoJSON files into the database, run the following script:
+    ```sh
+    python load_helsinki_data.py
+    ```
+
+4.  **Run the full workflow**:
     ```sh
     python run_workflow.py
     ```
@@ -43,7 +50,7 @@ The entire data pipeline is managed by a single script.
     b.  **Prepare Locations**: Geocodes any new addresses or postal codes.
     c.  **Check Status**: Prints a report on the final state of the database.
 
-4.  **Analyze the Data**:
+5.  **Analyze the Data**:
     Once the workflow is complete, you can use the Jupyter Notebooks to explore the data.
     -   To check the scraped data:
         ```sh
