@@ -21,10 +21,10 @@ This project is a Python application designed to scrape housing data from Oikoti
 ## Development Workflow
 
 1.  The main entry point for data collection is `run_workflow.py`.
-2.  To load and filter the large geospatial data into the database, run `python prepare_geospatial_data.py`.
+2.  To load and filter the large geospatial data into the database, run `python prepare_geospatial_data.py`. This is recommended for better performance in the visualization notebook.
 3.  To process the topographic data, run `python prepare_topographic_data.py`.
 4.  After the workflow completes, data can be analyzed in `notebooks/check_data.ipynb`.
-5.  Helsinki properties can be visualized in `notebooks/explore_open_data.ipynb`.
+5.  Helsinki properties can be visualized in `notebooks/explore_open_data.ipynb`. This notebook will first attempt to load pre-processed data from the database.
 6.  The GML data can be inspected in `notebooks/inspect_gml_data.ipynb`.
 7.  The database is located at `data/real_estate.duckdb`.
 8.  External data lookups (like road data) are currently disabled.
@@ -41,7 +41,7 @@ This project is a Python application designed to scrape housing data from Oikoti
 -   `check_db_status.py`: Prints a status report of the database.
 -   `notebooks/`: Contains Jupyter Notebooks for data analysis and exploration.
     -   `check_data.ipynb`: For data visualization and quality checks.
-    -   `explore_open_data.ipynb`: For visualizing Helsinki properties with a map background.
+    -   `explore_open_data.ipynb`: For visualizing Helsinki properties with a map background. It prioritizes loading data from the database for performance.
     -   `inspect_gml_data.ipynb`: For inspecting the GML data from the `L4134C.zip` file.
 -   `config/`: Contains configuration files.
     -   `config.json`: The main configuration file for the scraper.

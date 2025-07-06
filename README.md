@@ -10,7 +10,7 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 -   `docs/`: Project documentation.
 -   `notebooks/`: Jupyter notebooks for data analysis and visualization.
     -   `check_data.ipynb`: For data visualization and quality checks of the scraped data.
-    -   `explore_open_data.ipynb`: For visualizing Helsinki properties with a map background.
+    -   `explore_open_data.ipynb`: For visualizing Helsinki properties with a map background. It prioritizes loading data from the database for performance.
     -   `inspect_gml_data.ipynb`: For inspecting the GML data from the `L4134C.zip` file.
 -   `oikotie/`: The main Python package containing all source code.
 -   `output/`: (Ignored by git) For generated outputs like reports or images (currently unused).
@@ -22,8 +22,8 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 
 The entire data pipeline is managed by a single script.
 
-1.  **Prepare Geospatial Data (One-time setup)**:
-    Before running the main workflow, you need to load the large geospatial data into the database. This only needs to be done once.
+1.  **Prepare Geospatial Data (Recommended for performance)**:
+    Before running the visualization notebook, it is recommended to load the large geospatial data into the database. This only needs to be done once.
     ```sh
     python prepare_geospatial_data.py
     ```
