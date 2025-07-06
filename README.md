@@ -20,6 +20,7 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 -   `load_helsinki_data.py`: A script to load Helsinki-specific GeoJSON files into the database.
 -   `visualize_parcels.py`: A script to generate an interactive map of a sample of Helsinki parcels.
 -   `visualize_buildings.py`: A script to generate an interactive map of a sample of Helsinki buildings.
+-   `visualize_helsinki_layer.py`: A flexible script to visualize any Helsinki data layer from the database.
 
 ## Workflow
 
@@ -73,6 +74,10 @@ The entire data pipeline is managed by a single script.
     -   To generate an interactive map of a sample of Helsinki buildings:
         ```sh
         python visualize_buildings.py
+        ```
+    -   To generate an interactive map of any Helsinki layer:
+        ```sh
+        python visualize_helsinki_layer.py <table_name>
         ```
 
 ## Setup and Installation
