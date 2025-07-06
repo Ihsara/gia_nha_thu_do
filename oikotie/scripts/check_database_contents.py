@@ -50,5 +50,8 @@ def inspect_database():
     except Exception as e:
         logger.critical(f"An unexpected error occurred: {e}")
 
-if __name__ == "__main__":
+def main():
     inspect_database()
+
+if __name__ == "__main__":
+    main()

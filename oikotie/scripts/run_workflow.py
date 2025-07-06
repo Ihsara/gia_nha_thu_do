@@ -1,6 +1,6 @@
 from oikotie.scraper import main as run_scraper
-from prepare_locations import main as run_location_preparation
-from check_db_status import main as run_status_check
+from oikotie.scripts.prepare.prepare_locations import main as run_location_preparation
+from oikotie.scripts.check_database_contents import main as run_status_check
 from loguru import logger
 
 def main():
