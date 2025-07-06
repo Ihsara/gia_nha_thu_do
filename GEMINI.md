@@ -12,8 +12,7 @@ This project is a Python application designed to scrape housing data from Oikoti
 -   **Prepare geospatial data:** `python prepare_geospatial_data.py`
 -   **Prepare topographic data:** `python prepare_topographic_data.py`
 -   **Run the Jupyter dashboard:** `jupyter lab notebooks/check_data.ipynb`
--   **Explore open data:** `jupyter lab notebooks/explore_open_data.ipynb`
--   **Visualize Helsinki properties:** `jupyter lab notebooks/visualize_helsinki_properties.ipynb`
+-   **Visualize Helsinki properties:** `jupyter lab notebooks/explore_open_data.ipynb`
 -   **Inspect GML data:** `jupyter lab notebooks/inspect_gml_data.ipynb`
 -   **Run tests:** `pytest`
 -   **Run linter/formatter:** `ruff check . && ruff format .`
@@ -25,12 +24,11 @@ This project is a Python application designed to scrape housing data from Oikoti
 2.  To load and filter the large geospatial data into the database, run `python prepare_geospatial_data.py`.
 3.  To process the topographic data, run `python prepare_topographic_data.py`.
 4.  After the workflow completes, data can be analyzed in `notebooks/check_data.ipynb`.
-5.  Geospatial data from the National Land Survey of Finland can be explored in `notebooks/explore_open_data.ipynb`.
-6.  The processed Helsinki properties can be visualized in `notebooks/visualize_helsinki_properties.ipynb`.
-7.  The GML data can be inspected in `notebooks/inspect_gml_data.ipynb`.
-8.  The database is located at `data/real_estate.duckdb`.
-9.  External data lookups (like road data) are currently disabled.
-10. Configuration is managed in `config/config.json`.
+5.  Helsinki properties can be visualized in `notebooks/explore_open_data.ipynb`.
+6.  The GML data can be inspected in `notebooks/inspect_gml_data.ipynb`.
+7.  The database is located at `data/real_estate.duckdb`.
+8.  External data lookups (like road data) are currently disabled.
+9.  Configuration is managed in `config/config.json`.
 
 ## Key Components
 
@@ -43,8 +41,7 @@ This project is a Python application designed to scrape housing data from Oikoti
 -   `check_db_status.py`: Prints a status report of the database.
 -   `notebooks/`: Contains Jupyter Notebooks for data analysis and exploration.
     -   `check_data.ipynb`: For data visualization and quality checks.
-    -   `explore_open_data.ipynb`: For exploring geospatial data from the National Land Survey of Finland.
-    -   `visualize_helsinki_properties.ipynb`: For visualizing the processed Helsinki properties.
+    -   `explore_open_data.ipynb`: For visualizing Helsinki properties with a map background.
     -   `inspect_gml_data.ipynb`: For inspecting the GML data from the `L4134C.zip` file.
 -   `config/`: Contains configuration files.
     -   `config.json`: The main configuration file for the scraper.

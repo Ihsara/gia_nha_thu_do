@@ -9,6 +9,7 @@ scipy>=1.12.0
 branca>=0.7.1
 geopandas>=0.14.4
 fiona>=1.9.6
+contextily>=1.5.0
 
 [test]
 pytest>=8.0.0
