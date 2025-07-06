@@ -8,6 +8,7 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
     -   `config.json`: The main configuration file for the scraper.
 -   `data/`: (Ignored by git) Contains the raw and processed data, including the main `real_estate.duckdb` database and open data from the National Land Survey of Finland.
 -   `docs/`: Project documentation.
+    -   `scripts/`: Detailed documentation for the project's scripts.
 -   `notebooks/`: Jupyter notebooks for data analysis and visualization.
     -   `check_data.ipynb`: For data visualization and quality checks of the scraped data.
     -   `explore_open_data.ipynb`: For visualizing Helsinki properties with a map background. It prioritizes loading data from the database for performance.
@@ -24,7 +25,7 @@ This project scrapes real estate data from Oikotie.fi, prepares it for analysis,
 
 ## Workflow
 
-The entire data pipeline is managed by a single script.
+The entire data pipeline is managed by a single script. For detailed information on each script, please see the documentation in the `docs/scripts` directory.
 
 1.  **Prepare Geospatial Data (Recommended for performance)**:
     Before running the visualization notebook, it is recommended to load the large geospatial data into the database. This only needs to be done once.

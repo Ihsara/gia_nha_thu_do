@@ -51,6 +51,8 @@ This project is a Python application designed to scrape housing data from Oikoti
 -   `oikotie/geolocation.py`: Handles parallel geocoding of addresses and postal codes.
 -   `prepare_locations.py`: Executes the geocoding process.
 -   `check_db_status.py`: Prints a status report of the database.
+-   `docs/`: Project documentation.
+    -   `scripts/`: Detailed documentation for the project's scripts.
 -   `notebooks/`: Contains Jupyter Notebooks for data analysis and exploration.
     -   `check_data.ipynb`: For data visualization and quality checks.
     -   `explore_open_data.ipynb`: For visualizing Helsinki properties with a map background. It prioritizes loading data from the database for performance.
