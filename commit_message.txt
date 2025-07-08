@@ -1,0 +1,1 @@
+Fix: Handle empty GeoJSON files gracefully
