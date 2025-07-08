@@ -18,6 +18,8 @@ Before running this script, ensure the following GeoJSON files are present in th
 -   `02_KiinteistorajanSijaintitiedot.json`
 -   `03_KiinteistotunnuksenSijaintitiedot.json`
 -   `04_MaaraalanOsanSijaintitiedot.json`
+-   `05_ProjisoidunPalstanKiinteistotunnuksenSijaintitiedot.json`
+-   `06_ProjisoidunPalstanSijaintitiedot.json`
 -   `07_PalstanSijaintitiedot.json`
 
 ## How to Run
@@ -25,13 +27,13 @@ Before running this script, ensure the following GeoJSON files are present in th
 Execute the script from the root of the project directory using the following command:
 
 ```sh
-python load_helsinki_data.py
+python -m oikotie.scripts.prepare.load_helsinki_data
 ```
 
 ### Example
 
 ```
-(venv) G:\proj\oikotie> python load_helsinki_data.py
+(venv) G:\proj\oikotie> python -m oikotie.scripts.prepare.load_helsinki_data
 2025-07-07 00:00:00 | INFO     | __main__:main - Starting to load Helsinki data...
 ...
 2025-07-07 00:00:05 | SUCCESS  | __main__:process_and_load_file - Successfully loaded 12345 records into 'helsinki_07_palstansijaintitiedot'.

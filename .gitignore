@@ -125,9 +125,76 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# VSCode
+# IDE and Editor files
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Data and output
+# UV package manager
+.uv/
+
+# Project-specific data and output
 data/
 output/
+logs/
+
+# Database files
+*.duckdb
+*.duckdb.wal
+*.db
+*.sqlite
+
+# Selenium and browser automation
+chromedriver*
+geckodriver*
+*.tmp
+selenium-server-standalone-*.jar
+
+# Marimo cache
+__marimo__/cache/
+
+# Temporary files and directories
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Generated HTML files (visualization output)
+*.html
+!docs/**/*.html
+
+# Geospatial data files (large datasets)
+*.shp
+*.dbf
+*.shx
+*.prj
+*.cpg
+*.gml
+*.geojson
+*.kml
+*.kmz
+
+# Downloaded data files
+*.zip
+*.tar.gz
+*.csv
+!config/*.csv
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*~

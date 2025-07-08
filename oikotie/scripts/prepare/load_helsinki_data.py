@@ -12,6 +12,8 @@ FILES_TO_LOAD = [
     '02_KiinteistorajanSijaintitiedot.json',
     '03_KiinteistotunnuksenSijaintitiedot.json',
     '04_MaaraalanOsanSijaintitiedot.json',
+    '05_ProjisoidunPalstanKiinteistotunnuksenSijaintitiedot.json',
+    '06_ProjisoidunPalstanSijaintitiedot.json',
     '07_PalstanSijaintitiedot.json'
 ]
 
@@ -48,8 +50,7 @@ def process_and_load_file(file_path, con):
         logger.success(f"Successfully loaded {len(df_to_insert)} records into '{table_name}'.")
 
     except Exception as e:
-        logger.critical(f"An error occurred while processing {file_path}: {e}")
-        raise
+        logger.warning(f"Skipping file {file_path} due to an error: {e}")
 
 def main():
     """Main function to run the data loading process."""
