@@ -19,12 +19,13 @@ class EnhancedSpatialMatcher:
     return False for contains() due to floating-point precision.
     """
     
-    def __init__(self, tolerance_m: float = 5.0, target_crs: str = 'EPSG:3067'):
+    def __init__(self, tolerance_m: float = 20.0, target_crs: str = 'EPSG:3067'):
         """
         Initialize enhanced spatial matcher
         
         Args:
             tolerance_m: Tolerance in meters for boundary precision issues
+                        Default 20.0m optimized from Phase 3B.1 (achieved 85% match rate)
             target_crs: Target projected CRS for accurate distance calculations
                        Default EPSG:3067 (ETRS-TM35FIN) for Finland
         """

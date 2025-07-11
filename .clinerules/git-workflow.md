@@ -75,7 +75,16 @@ chore(deps): update shapely to latest version for geometry processing
 3. **Update documentation**: Commit documentation updates with related code
 4. **Prepare for merge**: Clean up commit history, ensure tests pass
 5. **Create commit summary**: Write comprehensive commit message
-6. **Push and review**: Push branch and create pull request if applicable
+6. **MANDATORY TASK COMPLETION COMMIT**: Every completed task MUST end with a git commit
+7. **Push and review**: Push branch and create pull request if applicable
+
+### Mandatory task completion commit requirements:
+- **EVERY TASK**: Must end with a git commit regardless of task size or scope
+- **Commit message format**: Use conventional commits with clear task description
+- **Include all changes**: All modified files from the task must be staged and committed
+- **Documentation updates**: Memory Bank updates and documentation changes included
+- **Descriptive messages**: Commit message should clearly describe what was accomplished
+- **Atomic commits**: Each task should result in one comprehensive, well-structured commit
 
 ### Memory Bank integration:
 - **Significant changes**: Any change that affects Memory Bank MUST include git context
