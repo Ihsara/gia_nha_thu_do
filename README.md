@@ -90,7 +90,7 @@ The Oikotie Analytics Platform automates the collection of property listings fro
 
 4. **Verify installation**
    ```bash
-   python -m oikotie.scripts.check_database_contents
+   uv run python -m oikotie.visualization.cli.commands info
    ```
 
 ### Alternative Installation Methods
@@ -132,57 +132,102 @@ pip install -e .
    python -m oikotie.scripts.visualize.visualize_parcels
    ```
 
-### Example Usage
+### Command-Line Interface
+
+The platform provides a comprehensive CLI for common tasks:
+
+```bash
+# Generate enhanced interactive dashboard
+uv run python -m oikotie.visualization.cli.commands dashboard --enhanced --open
+
+# Analyze specific buildings
+uv run python -m oikotie.visualization.cli.commands analyze --building-id OSM_12345
+
+# Validate data quality
+uv run python -m oikotie.visualization.cli.commands validate --schema --sample
+
+# Get system information
+uv run python -m oikotie.visualization.cli.commands info
+```
+
+**Available CLI Options:**
+- `--enhanced`: Enable enhanced dashboard features with building footprints
+- `--open`: Automatically open generated dashboard in browser
+- `--output`: Specify custom output directory
+- `--city`: Select city (helsinki, tampere, turku)
+
+### Python API Usage
 
 ```python
-from oikotie.scraper import OikotieScraper
-from oikotie.geolocation import get_db_connection
+from oikotie.visualization.dashboard.enhanced import EnhancedDashboard
+from oikotie.visualization.utils.data_loader import DataLoader
+from oikotie.visualization.utils.config import get_city_config
 
-# Initialize scraper
-scraper = OikotieScraper(headless=True)
+# Initialize data loader
+loader = DataLoader()
 
-# Collect property data
-url = "https://asunnot.oikotie.fi/myytavat-asunnot/helsinki"
-listings = scraper.get_all_listing_summaries(url)
+# Generate enhanced dashboard
+dashboard = EnhancedDashboard(
+    data_loader=loader,
+    city_config=get_city_config("helsinki")
+)
 
-# Store in database
-with get_db_connection() as conn:
-    # Process and store data
-    pass
-
-# Clean up
-scraper.close()
+# Create interactive visualization
+output_path = dashboard.run_dashboard_creation(
+    enhanced_mode=True,
+    max_listings=2000
+)
+print(f"Dashboard created: {output_path}")
 ```
 
 ## Usage
 
-### Data Collection Workflow
+### Data Collection and Visualization Workflow
 
-The platform follows a structured workflow for comprehensive data collection:
+The platform provides both legacy scripts and modern CLI tools:
 
-#### 1. **Prepare Geospatial Data** (Optional but Recommended)
+#### 1. **Modern CLI Workflow (Recommended)**
 ```bash
+# System information and validation
+uv run python -m oikotie.visualization.cli.commands info
+uv run python -m oikotie.visualization.cli.commands validate --schema
+
+# Generate enhanced interactive dashboards  
+uv run python -m oikotie.visualization.cli.commands dashboard --enhanced --open
+
+# Analyze specific buildings
+uv run python -m oikotie.visualization.cli.commands analyze --building-id OSM_12345
+
+# Progressive validation testing (10-sample → full scale)
+uv run python -m tests.validation.test_10_samples
+uv run python -m tests.validation.test_full_helsinki
+```
+
+#### 2. **Legacy Script Workflow**
+```bash
+# Prepare geospatial data (optional)
 python -m oikotie.scripts.prepare.prepare_geospatial_data
-python -m oikotie.scripts.prepare.prepare_topographic_data
 python -m oikotie.scripts.prepare.load_helsinki_data
-```
 
-#### 2. **Execute Complete Workflow**
-```bash
+# Execute complete data collection
 python -m oikotie.scripts.run_workflow
-```
 
-#### 3. **Analysis and Visualization**
-```bash
 # Database analysis
 python -m oikotie.scripts.check_database_contents
 
-# Generate specific visualizations
-python -m oikotie.scripts.visualize.visualize_buildings
-python -m oikotie.scripts.visualize.visualize_helsinki_layer <table_name>
-
 # Interactive analysis
 jupyter notebook notebooks/
+```
+
+#### 3. **Enhanced Dashboard Features**
+```bash
+# Multiple visualization modes
+uv run python -m oikotie.visualization.cli.commands dashboard --enhanced
+# ✅ Split-screen layout (30% controls + 70% map)
+# ✅ Gradient building highlighting with price-based colors
+# ✅ Multi-mode view system (Direct/Buffer/No-match)
+# ✅ Interactive controls (toggles, filters, sliders)
+# ✅ Building footprint visualization with OSM data
 ```
 
 ### Configuration
@@ -219,15 +264,30 @@ The platform includes comprehensive Jupyter notebooks for data exploration:
 
 ### Command-Line Interface
 
-Available scripts and their purposes:
+#### Modern CLI Commands (Recommended)
 
-| Script | Purpose |
-|--------|---------|
-| `run_workflow.py` | Execute complete data collection pipeline |
-| `check_database_contents.py` | Analyze database status and contents |
-| `prepare_geospatial_data.py` | Process Helsinki geospatial datasets |
-| `visualize_buildings.py` | Generate building visualization maps |
-| `visualize_parcels.py` | Create parcel boundary visualizations |
+| Command | Purpose | Example |
+|---------|---------|---------|
+| `dashboard` | Generate interactive dashboards | `uv run python -m oikotie.visualization.cli.commands dashboard --enhanced --open` |
+| `analyze` | Building-specific analysis | `uv run python -m oikotie.visualization.cli.commands analyze --building-id OSM_12345` |
+| `validate` | Data quality validation | `uv run python -m oikotie.visualization.cli.commands validate --schema --sample` |
+| `info` | System information display | `uv run python -m oikotie.visualization.cli.commands info` |
+
+#### Database Operations
+
+| Command | Purpose |
+|---------|---------|
+| `python -c "from oikotie.database.schema import DatabaseSchema; print(DatabaseSchema().get_table_info())"` | Check database schema |
+| `python -c "from oikotie.database.models import Listing; print('Models available')"` | Validate data models |
+
+#### Test Validation (Quality Assurance)
+
+| Test | Purpose |
+|------|---------|
+| `pytest tests/validation/test_10_samples.py` | Quick 10-sample validation |
+| `pytest tests/validation/test_postal_code.py` | Postal code specific testing |
+| `pytest tests/validation/test_full_helsinki.py` | Full Helsinki dataset validation |
+| `pytest tests/validation/test_package_imports.py` | Package structure validation |
 
 ## Documentation
 
@@ -241,10 +301,24 @@ Comprehensive documentation is available in the `docs/` directory:
 
 Key modules and their functionality:
 
+#### Core Modules
 - `oikotie.scraper` - Web scraping functionality
 - `oikotie.geolocation` - Address processing and geocoding
 - `oikotie.utils` - Utility functions and helpers
 - `oikotie.road_data` - Road network data processing
+
+#### Visualization Package
+- `oikotie.visualization.dashboard.enhanced` - Enhanced interactive dashboards
+- `oikotie.visualization.dashboard.builder` - Dashboard construction utilities
+- `oikotie.visualization.utils.data_loader` - Database connection and data loading
+- `oikotie.visualization.utils.config` - Configuration management
+- `oikotie.visualization.utils.geometry` - Spatial processing utilities
+- `oikotie.visualization.cli.commands` - Command-line interface
+
+#### Database Package
+- `oikotie.database.schema` - Database schema definitions
+- `oikotie.database.models` - Data model classes
+- `oikotie.database.migration` - Database migration utilities
 
 ## Development
 
@@ -267,19 +341,37 @@ Key modules and their functionality:
 
 ```
 oikotie/
-├── config/                 # Configuration files
-├── data/                   # Data storage (git-ignored)
-├── docs/                   # Project documentation
-├── memory-bank/            # Project knowledge management
-├── notebooks/              # Jupyter analysis notebooks
-├── oikotie/               # Main Python package
-│   ├── scripts/           # Executable scripts
-│   │   ├── prepare/       # Data preparation
-│   │   └── visualize/     # Visualization
-│   └── utils/             # Utility functions
-├── output/                # Generated files (git-ignored)
-├── tests/                 # Test suite
-└── logs/                  # Log files
+├── .clinerules/           # Development workflow standards
+│   ├── database-management.md
+│   ├── error-documentation-system.md
+│   └── progressive-validation-strategy.md
+├── config/                # Configuration files
+├── data/                  # Data storage (git-ignored)
+│   └── real_estate.duckdb # Main DuckDB database
+├── docs/                  # Project documentation
+│   ├── errors/            # Error documentation system
+│   └── scripts/           # Script documentation
+├── memory-bank/           # Project knowledge management
+├── notebooks/             # Jupyter analysis notebooks
+├── oikotie/              # Main Python package
+│   ├── database/         # Database schema and models
+│   │   ├── schema.py     # Table definitions and relationships
+│   │   ├── models.py     # Data model classes
+│   │   └── migration.py  # Migration utilities
+│   ├── scripts/          # Legacy executable scripts
+│   ├── visualization/    # Modern visualization package
+│   │   ├── cli/          # Command-line interface
+│   │   ├── dashboard/    # Dashboard generation
+│   │   ├── maps/         # Map utilities
+│   │   └── utils/        # Visualization utilities
+│   └── utils/            # Core utility functions
+├── output/               # Generated files (git-ignored)
+│   └── visualization/    # Dashboard outputs
+├── tests/                # Test suite
+│   ├── integration/      # Integration tests
+│   ├── unit/             # Unit tests
+│   └── validation/       # Validation tests
+└── logs/                 # Log files
 ```
 
 ### Architecture Overview
@@ -294,6 +386,17 @@ The platform uses a modular architecture:
 
 ### Testing
 
+#### Bug Prevention Testing (MANDATORY)
+For expensive computational pipelines (>10 minutes), comprehensive bug testing is **required** before execution:
+
+```bash
+# Run critical bug validation tests (10 seconds)
+uv run python simple_bug_test.py
+
+# Only proceed with expensive operations after 100% test pass rate
+```
+
+#### Standard Testing
 ```bash
 # Run all tests
 pytest
@@ -306,6 +409,12 @@ pytest tests/test_dashboard.py
 # Generate coverage report
 pytest --cov=oikotie --cov-report=html
 ```
+
+#### Testing Workflow Rules
+- **ANY script taking >10 minutes MUST have bug tests created first**
+- **NO expensive pipeline execution without passing bug validation**
+- **ALL known bugs from previous failures MUST be cataloged and tested**
+- See `.clinerules/testing-workflow.md` for complete testing procedures
 
 ### Code Style
 
