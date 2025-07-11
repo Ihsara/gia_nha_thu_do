@@ -13,6 +13,7 @@ contextily>=1.5.0
 geodatasets>=2023.5.0
 ipython>=8.18.1
 ipykernel>=6.29.5
+osmnx>=2.0.5
 
 [test]
 pytest>=8.0.0
