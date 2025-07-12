@@ -53,11 +53,13 @@ class SimpleMarketDashboard:
         center_lat = listings_df['latitude'].mean()
         center_lon = listings_df['longitude'].mean()
         
-        # Create base map
+        # Create base map with proper sizing
         m = folium.Map(
             location=[center_lat, center_lon],
             zoom_start=11,
-            tiles='OpenStreetMap'
+            tiles='OpenStreetMap',
+            width='100%',
+            height='550px'
         )
         
         # Color scheme based on price
@@ -283,6 +285,14 @@ class SimpleMarketDashboard:
             border-radius: 10px;
             padding: 1rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-height: 600px;
+        }}
+        
+        .map-section iframe {{
+            width: 100% !important;
+            height: 550px !important;
+            border: none;
+            border-radius: 5px;
         }}
         
         .charts-section {{
