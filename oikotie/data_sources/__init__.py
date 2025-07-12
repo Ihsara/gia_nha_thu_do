@@ -1,16 +1,22 @@
 """
-Data source abstractions for Finnish geodata integration.
+Data sources package for accessing various geodata sources.
 
-This module provides interfaces and implementations for accessing geodata from
-multiple sources including WMS services and local GeoPackage files.
+This package provides abstracted interfaces for different types of geodata sources
+including WMS services, GeoPackage files, and a unified manager that intelligently
+combines multiple sources for optimal data access.
 """
 
 from .base import GeoDataSource
 from .wms_source import WMSDataSource
 from .geopackage_source import GeoPackageDataSource
+from .unified_manager import UnifiedDataManager, create_helsinki_manager, QueryType, DataSourcePriority
 
 __all__ = [
     'GeoDataSource',
-    'WMSDataSource',
-    'GeoPackageDataSource'
+    'WMSDataSource', 
+    'GeoPackageDataSource',
+    'UnifiedDataManager',
+    'create_helsinki_manager',
+    'QueryType',
+    'DataSourcePriority'
 ]
