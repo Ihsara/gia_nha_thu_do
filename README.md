@@ -31,7 +31,9 @@ The Oikotie Analytics Platform automates the collection of property listings fro
 
 ### 🗺️ **Geospatial Data Integration**
 - Automated address geocoding and standardization
-- Integration with Helsinki open data sources
+- Dual-source geodata: Finnish National WMS & Helsinki GeoPackage
+- 128 topographic layers including 59,426 building polygons
+- Abstract data source interface for seamless switching
 - Building footprint and parcel boundary processing
 - Topographic and infrastructure data enrichment
 

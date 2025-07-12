@@ -26,6 +26,9 @@ Requires-Dist: ipykernel>=6.29.5
 Requires-Dist: osmnx>=2.0.5
 Requires-Dist: scikit-learn>=1.6.1
 Requires-Dist: plotly>=6.2.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: OWSLib>=0.30.0
+Requires-Dist: pyarrow>=15.0.0
 Provides-Extra: test
 Requires-Dist: pytest>=8.0.0; extra == "test"
 Requires-Dist: pytest-mock>=3.12.0; extra == "test"
