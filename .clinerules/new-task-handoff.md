@@ -4,6 +4,16 @@
 
 This guide provides **MANDATORY** instructions for effectively breaking down complex tasks and implementing a smooth handoff process between tasks. You **MUST** follow these guidelines to ensure continuity, context preservation, and efficient task completion.
 
+## ⚠️ MANDATORY TASK REMINDERS ⚠️
+
+**EVERY new task MUST include these reminders:**
+
+1. **Visualization Output**: All visualization files MUST be created in `output/visualization/` directory
+2. **Housekeeping Required**: Always clean up temporary files from main project directory
+3. **Progressive Validation**: Use 10 → 100 → Full scale validation for spatial processing
+4. **Related Data Only**: Only visualize polygons/buildings that have relationships with listings
+5. **Performance Focus**: Only process and display relevant data to avoid performance issues
+
 ## ⚠️ CONTEXT WINDOW MONITORING - MANDATORY ACTION REQUIRED ⚠️
 
 You **MUST** monitor the context window usage displayed in the environment details. When usage exceeds 50% of the available context window, you **MUST** initiate a task handoff using the `new_task` tool.

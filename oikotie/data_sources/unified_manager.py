@@ -147,15 +147,22 @@ class UnifiedDataManager:
         }
     
     def _get_cache_key(self, query_type: QueryType, bbox: Optional[Tuple], limit: Optional[int], **kwargs) -> str:
-        """Generate cache key for query parameters."""
+        """Generate cache key for query parameters with enhanced specificity."""
         cache_data = {
             "query_type": query_type.value,
-            "bbox": bbox,
+            "bbox": tuple(round(x, 6) for x in bbox) if bbox else None,  # Round bbox for consistency
             "limit": limit,
             **kwargs
         }
+        
+        # Include all kwargs to ensure unique keys for different parameters
         cache_str = str(sorted(cache_data.items()))
-        return hashlib.md5(cache_str.encode()).hexdigest()
+        cache_key = hashlib.md5(cache_str.encode()).hexdigest()
+        
+        # Log cache key generation for debugging
+        self.logger.debug(f"Generated cache key {cache_key[:8]}... for: {cache_data}")
+        
+        return cache_key
     
     def _get_from_cache(self, cache_key: str) -> Optional[gpd.GeoDataFrame]:
         """Retrieve data from cache if available and not expired."""
@@ -340,7 +347,8 @@ class UnifiedDataManager:
         self,
         bbox: Optional[Tuple[float, float, float, float]] = None,
         limit: Optional[int] = None,
-        use_cache: bool = True
+        use_cache: bool = True,
+        **kwargs
     ) -> gpd.GeoDataFrame:
         """
         Fetch address data using optimal source selection.
@@ -354,7 +362,7 @@ class UnifiedDataManager:
             GeoDataFrame with address points and attributes
         """
         query_type = QueryType.ADDRESSES
-        cache_key = self._get_cache_key(query_type, bbox, limit)
+        cache_key = self._get_cache_key(query_type, bbox, limit, **kwargs)
         
         # Try cache first
         if use_cache:

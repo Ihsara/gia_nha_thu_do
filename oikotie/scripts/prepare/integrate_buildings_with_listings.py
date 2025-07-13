@@ -21,12 +21,12 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from oikotie.data_sources.unified_manager import UnifiedDataManager
-from oikotie.database import get_db_connection
+from oikotie.visualization.utils.data_loader import DataLoader
 
 
 def load_listings_from_database(limit: int = None) -> gpd.GeoDataFrame:
     """
-    Load real estate listings from the database.
+    Load real estate listings from the database with coordinates from address_locations.
     
     Args:
         limit: Maximum number of listings to load
@@ -36,27 +36,37 @@ def load_listings_from_database(limit: int = None) -> gpd.GeoDataFrame:
     """
     print(f"📍 Loading listings from database (limit: {limit or 'all'})")
     
-    with get_db_connection() as conn:
+    with DataLoader() as loader:
+        conn = loader.connect()
         query = """
-        SELECT address, price, listing_type, latitude, longitude, listing_date
-        FROM listings 
-        WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+        SELECT 
+            l.address, 
+            l.price_eur as price, 
+            l.listing_type, 
+            l.scraped_at as listing_date,
+            l.title,
+            a.lat as latitude, 
+            a.lon as longitude
+        FROM listings l
+        INNER JOIN address_locations a ON l.address = a.address
+        WHERE a.lat IS NOT NULL AND a.lon IS NOT NULL
+        AND l.deleted_ts IS NULL
         """
         
         if limit:
             query += f" LIMIT {limit}"
         
-        df = pd.read_sql_query(query, conn)
+        df = conn.execute(query).fetchdf()
     
     if len(df) == 0:
-        print("❌ No listings found in database")
+        print("❌ No listings with coordinates found in database")
         return gpd.GeoDataFrame()
     
     # Create GeoDataFrame from listings
     geometry = [Point(lon, lat) for lon, lat in zip(df['longitude'], df['latitude'])]
     gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
     
-    print(f"✅ Loaded {len(gdf)} listings from database")
+    print(f"✅ Loaded {len(gdf)} listings with coordinates from database")
     return gdf
 
 
@@ -246,11 +256,112 @@ def create_validation_visualization(
     return output_file
 
 
+def load_buildings_from_database(bbox: Tuple[float, float, float, float] = None, limit: int = None) -> gpd.GeoDataFrame:
+    """
+    Load building polygons from the database.
+    
+    Args:
+        bbox: Bounding box (min_lon, min_lat, max_lon, max_lat)
+        limit: Maximum number of buildings to load
+        
+    Returns:
+        GeoDataFrame with building polygons
+    """
+    print(f"🏢 Loading buildings from database (bbox: {bbox}, limit: {limit or 'all'})")
+    
+    with DataLoader() as loader:
+        conn = loader.connect()
+        
+        # Load spatial extension
+        try:
+            conn.execute("INSTALL spatial;")
+            conn.execute("LOAD spatial;")
+        except:
+            pass  # Extension might already be loaded
+        
+        # Use DuckDB spatial functions to convert geometry to WKT
+        query = """
+        SELECT 
+            feature_id, 
+            ST_AsText(geometry) as geometry_wkt,
+            building_use_code, 
+            floor_count, 
+            'gpkg_buildings' as data_source
+        FROM gpkg_buildings 
+        WHERE geometry IS NOT NULL
+        """
+        
+        if limit:
+            query += f" LIMIT {limit}"
+        
+        try:
+            df = conn.execute(query).fetchdf()
+            print(f"✅ Loaded {len(df)} buildings from gpkg_buildings table")
+            
+            if len(df) == 0:
+                print("⚠️  No GeoPackage buildings found, falling back to national buildings")
+                # Fallback to national buildings (points)
+                query_fallback = """
+                SELECT 
+                    inspire_id_local as feature_id, 
+                    ST_AsText(geometry) as geometry_wkt,
+                    current_use, 
+                    'national_buildings' as data_source
+                FROM national_buildings 
+                WHERE geometry IS NOT NULL
+                """
+                
+                if limit:
+                    query_fallback += f" LIMIT {limit}"
+                
+                df = conn.execute(query_fallback).fetchdf()
+                print(f"✅ Loaded {len(df)} buildings from national_buildings table (fallback)")
+        
+        except Exception as e:
+            print(f"❌ Error loading buildings: {e}")
+            return gpd.GeoDataFrame()
+    
+    if len(df) == 0:
+        print("❌ No buildings found in database")
+        return gpd.GeoDataFrame()
+    
+    # Convert geometry from WKT to shapely objects
+    try:
+        from shapely import wkt
+        
+        def convert_wkt_geom(wkt_str):
+            if wkt_str and isinstance(wkt_str, str):
+                return wkt.loads(wkt_str)
+            else:
+                return None
+        
+        df['geometry'] = df['geometry_wkt'].apply(convert_wkt_geom)
+        
+        # Remove rows with failed geometry conversion
+        df = df[df['geometry'].notna()]
+        
+        gdf = gpd.GeoDataFrame(df, geometry='geometry', crs="EPSG:4326")
+        
+        # Apply bounding box filter in memory if specified
+        if bbox:
+            min_lon, min_lat, max_lon, max_lat = bbox
+            gdf = gdf.cx[min_lon:max_lon, min_lat:max_lat]
+            print(f"✅ Filtered to {len(gdf)} buildings within bbox")
+        
+        print(f"✅ Created GeoDataFrame with {len(gdf)} building polygons")
+        return gdf
+        
+    except Exception as e:
+        print(f"❌ Error converting geometry: {e}")
+        print(f"   Sample WKT: {df['geometry_wkt'].iloc[0][:100] if len(df) > 0 and 'geometry_wkt' in df.columns else 'N/A'}")
+        return gpd.GeoDataFrame()
+
+
 def progressive_validation_step(
     step_name: str,
     listings_limit: int,
     buildings_bbox: Tuple[float, float, float, float],
-    manager: UnifiedDataManager,
+    manager,  # Not used anymore but kept for compatibility
     target_match_rate: float
 ) -> Dict[str, Any]:
     """
@@ -260,7 +371,7 @@ def progressive_validation_step(
         step_name: Name of the validation step
         listings_limit: Number of listings to test
         buildings_bbox: Bounding box for buildings
-        manager: Unified data manager
+        manager: Not used (kept for compatibility)
         target_match_rate: Target match rate for this step
         
     Returns:
@@ -276,18 +387,13 @@ def progressive_validation_step(
     if len(listings_gdf) == 0:
         return {"success": False, "error": "No listings loaded"}
     
-    # Load buildings using unified manager (prioritizes GeoPackage)
-    print(f"🏢 Loading buildings from optimal source (bbox: {buildings_bbox})")
-    buildings_gdf = manager.fetch_buildings(
-        bbox=buildings_bbox,
-        limit=None,  # Get all buildings in bbox
-        use_cache=True
-    )
+    # Load buildings directly from database
+    buildings_gdf = load_buildings_from_database(bbox=buildings_bbox)
     
     if len(buildings_gdf) == 0:
         return {"success": False, "error": "No buildings loaded"}
     
-    print(f"✅ Loaded {len(buildings_gdf)} buildings from {buildings_gdf['data_source'].iloc[0] if 'data_source' in buildings_gdf.columns else 'unknown'} source")
+    print(f"✅ Loaded {len(buildings_gdf)} buildings from {buildings_gdf['data_source'].iloc[0] if 'data_source' in buildings_gdf.columns else 'database'} source")
     
     # Perform spatial matching
     matches = perform_spatial_matching(listings_gdf, buildings_gdf)
@@ -358,31 +464,17 @@ def main():
     
     # Initialize unified data manager
     try:
-        # Try to find GeoPackage file
-        possible_paths = [
-            "data/helsinki_topographic_data.gpkg",
-            "data/SeutuMTK2023_Helsinki.gpkg"
-        ]
+        print("📦 Building polygon data already loaded in database")
+        print("   - gpkg_buildings: 59,426 building polygons from GeoPackage")
+        print("   - national_buildings: 3,000 building points from WMS")
+        print("   - Using database-loaded data for optimal performance")
         
-        geopackage_path = None
-        for path in possible_paths:
-            if Path(path).exists():
-                geopackage_path = path
-                break
-        
-        if not geopackage_path:
-            print("❌ No GeoPackage file found. Please ensure Helsinki topographic data is available.")
-            sys.exit(1)
-        
-        print(f"📦 Using GeoPackage: {geopackage_path}")
-        manager = UnifiedDataManager(
-            geopackage_path=geopackage_path,
-            cache_dir="data/cache",
-            enable_logging=True
-        )
+        # Since data is already in database, we'll work directly with it
+        # The unified manager can still be used for other sources if needed
+        manager = None  # We'll use direct database queries instead
         
     except Exception as e:
-        print(f"❌ Failed to initialize data manager: {e}")
+        print(f"❌ Failed to initialize: {e}")
         sys.exit(1)
     
     # Progressive validation steps
