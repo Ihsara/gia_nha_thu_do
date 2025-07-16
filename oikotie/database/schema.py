@@ -1,346 +1,337 @@
 """
-Database Schema Definitions for Oikotie Real Estate Project
+Database schema definitions for the Oikotie automation system.
 
-This module provides comprehensive schema definitions, table relationships,
-and validation utilities for the DuckDB database structure.
+This module defines the enhanced database schema with automation metadata,
+execution tracking, and data quality management capabilities.
 """
 
+from typing import Dict, List, Optional
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
-from enum import Enum
-
-
-class TableNames(Enum):
-    """Enumeration of all table names in the database"""
-    LISTINGS = "listings"
-    OSM_BUILDINGS = "osm_buildings"
-    ADDRESS_LOCATIONS = "address_locations"
-    HELSINKI_PROPERTY_BOUNDARIES = "helsinki_property_boundaries"
-    HELSINKI_ADMIN_MARKERS = "helsinki_admin_markers"
-
-
-@dataclass
-class ColumnDefinition:
-    """Definition of a database column"""
-    name: str
-    data_type: str
-    nullable: bool = True
-    primary_key: bool = False
-    foreign_key: Optional[str] = None
-    description: str = ""
+from datetime import datetime
+import duckdb
+from loguru import logger
 
 
 @dataclass
 class TableSchema:
-    """Complete schema definition for a database table"""
+    """Represents a database table schema."""
     name: str
-    columns: List[ColumnDefinition]
-    indexes: List[str]
+    columns: Dict[str, str]
     constraints: List[str]
-    description: str = ""
-    row_count: Optional[int] = None
+    indexes: List[str]
 
 
 class DatabaseSchema:
-    """Complete database schema definition and validation"""
+    """Manages database schema definitions and operations."""
     
-    def __init__(self):
-        self.tables = self._define_tables()
+    def __init__(self, db_path: str = "data/real_estate.duckdb"):
+        self.db_path = db_path
+        self.schemas = self._define_schemas()
     
-    def _define_tables(self) -> Dict[str, TableSchema]:
-        """Define all table schemas in the database"""
-        
-        # Listings table schema
-        listings_schema = TableSchema(
-            name=TableNames.LISTINGS.value,
-            description="Real estate listings with spatial coordinates",
-            row_count=8725,
-            columns=[
-                ColumnDefinition("address", "TEXT", nullable=False, 
-                               foreign_key="address_locations.address",
-                               description="Property address (FK to address_locations)"),
-                ColumnDefinition("price", "REAL", nullable=True,
-                               description="Listing price in euros"),
-                ColumnDefinition("listing_type", "TEXT", nullable=True,
-                               description="Type of listing (sale, rent, etc.)"),
-                ColumnDefinition("latitude", "REAL", nullable=False,
-                               description="Latitude coordinate (WGS84)"),
-                ColumnDefinition("longitude", "REAL", nullable=False,
-                               description="Longitude coordinate (WGS84)"),
-                ColumnDefinition("geometry", "GEOMETRY(POINT, 4326)", nullable=False,
-                               description="Spatial point geometry in EPSG:4326"),
-                ColumnDefinition("listing_date", "DATE", nullable=True,
-                               description="Date when listing was published")
-            ],
-            indexes=[
-                "idx_listings_geometry",
-                "idx_listings_address", 
-                "idx_listings_listing_type"
-            ],
-            constraints=[
-                "FOREIGN KEY (address) REFERENCES address_locations(address)",
-                "CHECK (price > 0)",
-                "CHECK (latitude BETWEEN 60.0 AND 60.5)",
-                "CHECK (longitude BETWEEN 24.5 AND 25.5)",
-                "CHECK (ST_IsValid(geometry))"
-            ]
-        )
-        
-        # OSM Buildings table schema
-        osm_buildings_schema = TableSchema(
-            name=TableNames.OSM_BUILDINGS.value,
-            description="OpenStreetMap building footprints for Helsinki",
-            row_count=79556,
-            columns=[
-                ColumnDefinition("osm_id", "BIGINT", nullable=False, primary_key=True,
-                               description="Unique OpenStreetMap identifier"),
-                ColumnDefinition("geometry", "GEOMETRY(POLYGON, 4326)", nullable=False,
-                               description="Building footprint polygon in EPSG:4326"),
-                ColumnDefinition("building_type", "TEXT", nullable=True,
-                               description="Type of building (residential, commercial, etc.)"),
-                ColumnDefinition("name", "TEXT", nullable=True,
-                               description="Building name if available"),
-                ColumnDefinition("addr_street", "TEXT", nullable=True,
-                               description="Street name from OSM address"),
-                ColumnDefinition("addr_housenumber", "TEXT", nullable=True,
-                               description="House number from OSM address"),
-                ColumnDefinition("addr_postcode", "TEXT", nullable=True,
-                               description="Postal code from OSM address")
-            ],
-            indexes=[
-                "idx_osm_buildings_osm_id",
-                "idx_osm_buildings_geometry",
-                "idx_osm_buildings_building_type"
-            ],
-            constraints=[
-                "PRIMARY KEY (osm_id)",
-                "CHECK (ST_IsValid(geometry))",
-                "CHECK (ST_GeometryType(geometry) IN ('POLYGON', 'MULTIPOLYGON'))"
-            ]
-        )
-        
-        # Address Locations table schema
-        address_locations_schema = TableSchema(
-            name=TableNames.ADDRESS_LOCATIONS.value,
-            description="Geocoded address locations for Helsinki",
-            row_count=6643,
-            columns=[
-                ColumnDefinition("address", "TEXT", nullable=False, primary_key=True,
-                               description="Unique address string"),
-                ColumnDefinition("latitude", "REAL", nullable=False,
-                               description="Latitude coordinate (WGS84)"),
-                ColumnDefinition("longitude", "REAL", nullable=False,
-                               description="Longitude coordinate (WGS84)"),
-                ColumnDefinition("postcode", "TEXT", nullable=True,
-                               description="Postal code for the address"),
-                ColumnDefinition("district", "TEXT", nullable=True,
-                               description="District or neighborhood name"),
-                ColumnDefinition("geometry", "GEOMETRY(POINT, 4326)", nullable=False,
-                               description="Spatial point geometry in EPSG:4326")
-            ],
-            indexes=[
-                "idx_address_locations_address",
-                "idx_address_locations_geometry"
-            ],
-            constraints=[
-                "PRIMARY KEY (address)",
-                "CHECK (latitude BETWEEN 60.0 AND 60.5)",
-                "CHECK (longitude BETWEEN 24.5 AND 25.5)",
-                "CHECK (ST_IsValid(geometry))",
-                "CHECK (ST_GeometryType(geometry) = 'POINT')"
-            ]
-        )
-        
-        # Helsinki Property Boundaries table schema
-        helsinki_property_boundaries_schema = TableSchema(
-            name=TableNames.HELSINKI_PROPERTY_BOUNDARIES.value,
-            description="Administrative property boundaries for Helsinki",
-            columns=[
-                ColumnDefinition("boundary_id", "TEXT", nullable=False, primary_key=True,
-                               description="Unique boundary identifier"),
-                ColumnDefinition("boundary_type", "TEXT", nullable=True,
-                               description="Type of administrative boundary"),
-                ColumnDefinition("geometry", "GEOMETRY(POLYGON, 4326)", nullable=False,
-                               description="Boundary polygon geometry in EPSG:4326"),
-                ColumnDefinition("properties", "JSON", nullable=True,
-                               description="Additional boundary properties as JSON")
-            ],
-            indexes=[
-                "idx_helsinki_property_boundaries_geometry"
-            ],
-            constraints=[
-                "PRIMARY KEY (boundary_id)",
-                "CHECK (ST_IsValid(geometry))"
-            ]
-        )
-        
-        # Helsinki Admin Markers table schema
-        helsinki_admin_markers_schema = TableSchema(
-            name=TableNames.HELSINKI_ADMIN_MARKERS.value,
-            description="Administrative markers for Helsinki",
-            columns=[
-                ColumnDefinition("marker_id", "TEXT", nullable=False, primary_key=True,
-                               description="Unique marker identifier"),
-                ColumnDefinition("marker_type", "TEXT", nullable=True,
-                               description="Type of administrative marker"),
-                ColumnDefinition("geometry", "GEOMETRY(POINT, 4326)", nullable=False,
-                               description="Marker point geometry in EPSG:4326"),
-                ColumnDefinition("properties", "JSON", nullable=True,
-                               description="Additional marker properties as JSON")
-            ],
-            indexes=[
-                "idx_helsinki_admin_markers_geometry"
-            ],
-            constraints=[
-                "PRIMARY KEY (marker_id)",
-                "CHECK (ST_IsValid(geometry))",
-                "CHECK (ST_GeometryType(geometry) = 'POINT')"
-            ]
-        )
-        
+    def _define_schemas(self) -> Dict[str, TableSchema]:
+        """Define all table schemas for the automation system."""
         return {
-            TableNames.LISTINGS.value: listings_schema,
-            TableNames.OSM_BUILDINGS.value: osm_buildings_schema,
-            TableNames.ADDRESS_LOCATIONS.value: address_locations_schema,
-            TableNames.HELSINKI_PROPERTY_BOUNDARIES.value: helsinki_property_boundaries_schema,
-            TableNames.HELSINKI_ADMIN_MARKERS.value: helsinki_admin_markers_schema
+            'listings': self._define_listings_schema(),
+            'scraping_executions': self._define_executions_schema(),
+            'alert_configurations': self._define_alerts_schema(),
+            'data_lineage': self._define_lineage_schema(),
+            'api_usage_log': self._define_api_usage_schema(),
+            'address_locations': self._define_address_locations_schema(),
         }
     
-    def get_table_schema(self, table_name: str) -> Optional[TableSchema]:
-        """Get schema definition for a specific table"""
-        return self.tables.get(table_name)
+    def _define_listings_schema(self) -> TableSchema:
+        """Define enhanced listings table schema with automation metadata."""
+        return TableSchema(
+            name='listings',
+            columns={
+                # Original columns
+                'url': 'VARCHAR PRIMARY KEY',
+                'source': 'VARCHAR',
+                'city': 'VARCHAR',
+                'title': 'VARCHAR',
+                'address': 'VARCHAR',
+                'postal_code': 'VARCHAR',
+                'listing_type': 'VARCHAR',
+                'price_eur': 'FLOAT',
+                'size_m2': 'FLOAT',
+                'rooms': 'INTEGER',
+                'year_built': 'INTEGER',
+                'overview': 'VARCHAR',
+                'full_description': 'VARCHAR',
+                'other_details_json': 'VARCHAR',
+                'scraped_at': 'TIMESTAMP',
+                'insert_ts': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'updated_ts': 'TIMESTAMP',
+                'deleted_ts': 'TIMESTAMP',
+                
+                # Enhanced automation columns
+                'execution_id': 'VARCHAR(50)',
+                'last_check_ts': 'TIMESTAMP',
+                'check_count': 'INTEGER DEFAULT 0',
+                'last_error': 'TEXT',
+                'retry_count': 'INTEGER DEFAULT 0',
+                'data_quality_score': 'REAL',
+                'data_source': 'VARCHAR(50)',
+                'fetch_timestamp': 'TIMESTAMP',
+                'last_verified': 'TIMESTAMP',
+                'source_url': 'TEXT',
+            },
+            constraints=[
+                # Foreign key constraint removed for now - address_locations table may not exist
+                # 'CONSTRAINT fk_listings_address FOREIGN KEY (address) REFERENCES address_locations(address)',
+            ],
+            indexes=[
+                'CREATE INDEX IF NOT EXISTS idx_listings_city ON listings(city)',
+                'CREATE INDEX IF NOT EXISTS idx_listings_scraped_at ON listings(scraped_at)',
+                'CREATE INDEX IF NOT EXISTS idx_listings_last_check_ts ON listings(last_check_ts)',
+                'CREATE INDEX IF NOT EXISTS idx_listings_execution_id ON listings(execution_id)',
+                'CREATE INDEX IF NOT EXISTS idx_listings_data_quality_score ON listings(data_quality_score)',
+            ]
+        )
     
-    def get_all_tables(self) -> List[str]:
-        """Get list of all table names"""
-        return list(self.tables.keys())
+    def _define_executions_schema(self) -> TableSchema:
+        """Define scraping executions tracking table."""
+        return TableSchema(
+            name='scraping_executions',
+            columns={
+                'execution_id': 'VARCHAR(50) PRIMARY KEY',
+                'started_at': 'TIMESTAMP NOT NULL',
+                'completed_at': 'TIMESTAMP',
+                'status': 'VARCHAR(20) NOT NULL', # 'running', 'completed', 'failed'
+                'city': 'VARCHAR(50) NOT NULL',
+                'listings_processed': 'INTEGER DEFAULT 0',
+                'listings_new': 'INTEGER DEFAULT 0',
+                'listings_updated': 'INTEGER DEFAULT 0',
+                'listings_skipped': 'INTEGER DEFAULT 0',
+                'listings_failed': 'INTEGER DEFAULT 0',
+                'execution_time_seconds': 'INTEGER',
+                'memory_usage_mb': 'INTEGER',
+                'error_summary': 'TEXT',
+                'node_id': 'VARCHAR(50)', # for cluster deployments
+                'configuration_hash': 'VARCHAR(64)',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            },
+            constraints=[],
+            indexes=[
+                'CREATE INDEX IF NOT EXISTS idx_executions_started_at ON scraping_executions(started_at)',
+                'CREATE INDEX IF NOT EXISTS idx_executions_city ON scraping_executions(city)',
+                'CREATE INDEX IF NOT EXISTS idx_executions_status ON scraping_executions(status)',
+                'CREATE INDEX IF NOT EXISTS idx_executions_node_id ON scraping_executions(node_id)',
+            ]
+        )
     
-    def get_relationships(self) -> Dict[str, List[str]]:
-        """Get foreign key relationships between tables"""
-        relationships = {}
-        
-        for table_name, schema in self.tables.items():
-            table_fks = []
-            for column in schema.columns:
-                if column.foreign_key:
-                    table_fks.append(f"{column.name} -> {column.foreign_key}")
-            if table_fks:
-                relationships[table_name] = table_fks
-        
-        return relationships
+    def _define_alerts_schema(self) -> TableSchema:
+        """Define alert configurations table."""
+        return TableSchema(
+            name='alert_configurations',
+            columns={
+                'id': 'INTEGER PRIMARY KEY',
+                'alert_name': 'VARCHAR(100) NOT NULL',
+                'condition_type': 'VARCHAR(50) NOT NULL', # 'error_rate', 'execution_time', 'data_quality'
+                'threshold_value': 'REAL NOT NULL',
+                'comparison_operator': 'VARCHAR(10) NOT NULL', # '>', '<', '>=', '<=', '=='
+                'alert_channels': 'JSON NOT NULL', # ['email', 'slack', 'webhook']
+                'enabled': 'BOOLEAN DEFAULT TRUE',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            },
+            constraints=[],
+            indexes=[
+                'CREATE INDEX IF NOT EXISTS idx_alerts_enabled ON alert_configurations(enabled)',
+                'CREATE INDEX IF NOT EXISTS idx_alerts_condition_type ON alert_configurations(condition_type)',
+            ]
+        )
     
-    def get_spatial_tables(self) -> List[str]:
-        """Get list of tables with spatial columns"""
-        spatial_tables = []
-        
-        for table_name, schema in self.tables.items():
-            for column in schema.columns:
-                if column.data_type.startswith("GEOMETRY"):
-                    spatial_tables.append(table_name)
-                    break
-        
-        return spatial_tables
+    def _define_lineage_schema(self) -> TableSchema:
+        """Define data lineage tracking table."""
+        return TableSchema(
+            name='data_lineage',
+            columns={
+                'id': 'INTEGER PRIMARY KEY',
+                'table_name': 'VARCHAR(50) NOT NULL',
+                'record_id': 'VARCHAR(100) NOT NULL',
+                'data_source': 'VARCHAR(50) NOT NULL',
+                'fetch_timestamp': 'TIMESTAMP NOT NULL',
+                'api_endpoint': 'TEXT',
+                'request_parameters': 'JSON',
+                'response_metadata': 'JSON',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            },
+            constraints=[],
+            indexes=[
+                'CREATE INDEX IF NOT EXISTS idx_lineage_table_record ON data_lineage(table_name, record_id)',
+                'CREATE INDEX IF NOT EXISTS idx_lineage_data_source ON data_lineage(data_source)',
+                'CREATE INDEX IF NOT EXISTS idx_lineage_fetch_timestamp ON data_lineage(fetch_timestamp)',
+            ]
+        )
     
-    def validate_schema_compliance(self, actual_schema: Dict[str, Any]) -> Dict[str, List[str]]:
-        """Validate actual database schema against expected schema"""
-        issues = {}
+    def _define_api_usage_schema(self) -> TableSchema:
+        """Define API usage monitoring table."""
+        return TableSchema(
+            name='api_usage_log',
+            columns={
+                'id': 'INTEGER PRIMARY KEY',
+                'api_endpoint': 'VARCHAR(200) NOT NULL',
+                'request_timestamp': 'TIMESTAMP NOT NULL',
+                'response_status': 'INTEGER',
+                'response_time_ms': 'INTEGER',
+                'records_fetched': 'INTEGER',
+                'rate_limit_remaining': 'INTEGER',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            },
+            constraints=[],
+            indexes=[
+                'CREATE INDEX IF NOT EXISTS idx_api_usage_endpoint ON api_usage_log(api_endpoint)',
+                'CREATE INDEX IF NOT EXISTS idx_api_usage_timestamp ON api_usage_log(request_timestamp)',
+            ]
+        )
+    
+    def _define_address_locations_schema(self) -> TableSchema:
+        """Define address locations table (existing, for reference)."""
+        return TableSchema(
+            name='address_locations',
+            columns={
+                'address': 'TEXT PRIMARY KEY',
+                'latitude': 'REAL',
+                'longitude': 'REAL',
+                'postcode': 'TEXT',
+                'district': 'TEXT',
+                'geometry': 'GEOMETRY',
+            },
+            constraints=[],
+            indexes=[
+                # Only create index if postcode column exists
+                # 'CREATE INDEX IF NOT EXISTS idx_address_locations_postcode ON address_locations(postcode)',
+            ]
+        )
+    
+    def create_all_tables(self) -> None:
+        """Create all tables with their schemas."""
+        logger.info("Creating enhanced database schema for automation system")
         
-        for table_name, expected_schema in self.tables.items():
-            table_issues = []
+        try:
+            with duckdb.connect(self.db_path) as con:
+                # Enable spatial extension
+                con.execute("INSTALL spatial;")
+                con.execute("LOAD spatial;")
+                
+                for table_name, schema in self.schemas.items():
+                    self._create_table(con, schema)
+                    self._create_indexes(con, schema)
+                
+                logger.success("Enhanced database schema created successfully")
+                
+        except Exception as e:
+            logger.error(f"Failed to create database schema: {e}")
+            raise
+    
+    def _create_table(self, con: duckdb.DuckDBPyConnection, schema: TableSchema) -> None:
+        """Create a single table."""
+        columns_sql = ', '.join([f"{name} {definition}" for name, definition in schema.columns.items()])
+        constraints_sql = ', ' + ', '.join(schema.constraints) if schema.constraints else ''
+        
+        create_sql = f"""
+        CREATE TABLE IF NOT EXISTS {schema.name} (
+            {columns_sql}{constraints_sql}
+        );
+        """
+        
+        logger.debug(f"Creating table {schema.name}")
+        con.execute(create_sql)
+    
+    def _create_indexes(self, con: duckdb.DuckDBPyConnection, schema: TableSchema) -> None:
+        """Create indexes for a table."""
+        for index_sql in schema.indexes:
+            logger.debug(f"Creating index: {index_sql}")
+            con.execute(index_sql)
+    
+    def get_table_info(self) -> Dict[str, Dict]:
+        """Get information about all tables."""
+        table_info = {}
+        
+        try:
+            with duckdb.connect(self.db_path, read_only=True) as con:
+                for table_name in self.schemas.keys():
+                    try:
+                        # Check if table exists
+                        result = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+                        row_count = result[0] if result else 0
+                        
+                        # Get schema info
+                        schema_result = con.execute(f"DESCRIBE {table_name}").fetchall()
+                        columns = [{'name': row[0], 'type': row[1]} for row in schema_result]
+                        
+                        table_info[table_name] = {
+                            'exists': True,
+                            'row_count': row_count,
+                            'columns': columns
+                        }
+                    except Exception as e:
+                        table_info[table_name] = {
+                            'exists': False,
+                            'error': str(e)
+                        }
+                        
+        except Exception as e:
+            logger.error(f"Failed to get table info: {e}")
             
-            # Check if table exists
-            if table_name not in actual_schema:
-                table_issues.append(f"Table {table_name} does not exist")
-                issues[table_name] = table_issues
-                continue
-            
-            # Check columns
-            actual_columns = actual_schema[table_name].get('columns', {})
-            expected_columns = {col.name: col for col in expected_schema.columns}
-            
-            for col_name, expected_col in expected_columns.items():
-                if col_name not in actual_columns:
-                    table_issues.append(f"Column {col_name} missing")
-                # Additional column validation could be added here
-            
-            if table_issues:
-                issues[table_name] = table_issues
-        
-        return issues
+        return table_info
     
-    def generate_create_table_sql(self, table_name: str) -> str:
-        """Generate CREATE TABLE SQL statement for a table"""
-        schema = self.get_table_schema(table_name)
-        if not schema:
-            raise ValueError(f"Unknown table: {table_name}")
+    def validate_schema(self) -> bool:
+        """Validate that all required tables and columns exist."""
+        logger.info("Validating database schema")
         
-        lines = [f"CREATE TABLE {table_name} ("]
-        
-        # Add column definitions
-        column_lines = []
-        for column in schema.columns:
-            col_def = f"    {column.name} {column.data_type}"
-            if not column.nullable:
-                col_def += " NOT NULL"
-            if column.primary_key:
-                col_def += " PRIMARY KEY"
-            column_lines.append(col_def)
-        
-        lines.append(",\n".join(column_lines))
-        lines.append(");")
-        
-        return "\n".join(lines)
-    
-    def generate_index_sql(self, table_name: str) -> List[str]:
-        """Generate CREATE INDEX SQL statements for a table"""
-        schema = self.get_table_schema(table_name)
-        if not schema:
-            raise ValueError(f"Unknown table: {table_name}")
-        
-        index_statements = []
-        for index_name in schema.indexes:
-            if "geometry" in index_name:
-                # Spatial index
-                column_name = index_name.split("_")[-1]  # Extract column name
-                sql = f"CREATE INDEX {index_name} ON {table_name} USING GIST({column_name});"
+        try:
+            table_info = self.get_table_info()
+            all_valid = True
+            
+            # Core tables that must exist
+            core_tables = ['listings', 'scraping_executions']
+            
+            for table_name, schema in self.schemas.items():
+                if not table_info.get(table_name, {}).get('exists', False):
+                    if table_name in core_tables:
+                        logger.error(f"Core table {table_name} does not exist")
+                        all_valid = False
+                    else:
+                        logger.warning(f"Optional table {table_name} does not exist")
+                    continue
+                
+                existing_columns = {col['name'] for col in table_info[table_name]['columns']}
+                required_columns = set(schema.columns.keys())
+                
+                missing_columns = required_columns - existing_columns
+                if missing_columns:
+                    if table_name in core_tables:
+                        # For core tables, only check essential columns
+                        essential_columns = self._get_essential_columns(table_name)
+                        missing_essential = missing_columns & essential_columns
+                        if missing_essential:
+                            logger.error(f"Core table {table_name} missing essential columns: {missing_essential}")
+                            all_valid = False
+                        else:
+                            logger.info(f"Core table {table_name} missing optional columns: {missing_columns}")
+                    else:
+                        logger.warning(f"Optional table {table_name} missing columns: {missing_columns}")
+            
+            if all_valid:
+                logger.success("Database schema validation passed")
             else:
-                # Regular index - determine column from index name
-                column_name = index_name.replace(f"idx_{table_name}_", "")
-                sql = f"CREATE INDEX {index_name} ON {table_name}({column_name});"
+                logger.error("Database schema validation failed")
+                
+            return all_valid
             
-            index_statements.append(sql)
-        
-        return index_statements
-
-
-# Global schema instance
-DATABASE_SCHEMA = DatabaseSchema()
-
-
-def get_database_schema() -> DatabaseSchema:
-    """Get the global database schema instance"""
-    return DATABASE_SCHEMA
-
-
-def get_table_names() -> List[str]:
-    """Get list of all table names"""
-    return DATABASE_SCHEMA.get_all_tables()
-
-
-def get_table_info(table_name: str) -> Optional[TableSchema]:
-    """Get schema information for a specific table"""
-    return DATABASE_SCHEMA.get_table_schema(table_name)
-
-
-def get_spatial_tables() -> List[str]:
-    """Get list of tables with spatial geometry columns"""
-    return DATABASE_SCHEMA.get_spatial_tables()
-
-
-def get_foreign_key_relationships() -> Dict[str, List[str]]:
-    """Get foreign key relationships between tables"""
-    return DATABASE_SCHEMA.get_relationships()
-
-
-def validate_database_schema(actual_schema: Dict[str, Any]) -> Dict[str, List[str]]:
-    """Validate actual database schema against expected schema"""
-    return DATABASE_SCHEMA.validate_schema_compliance(actual_schema)
+        except Exception as e:
+            logger.error(f"Schema validation failed: {e}")
+            return False
+    
+    def _get_essential_columns(self, table_name: str) -> set:
+        """Get essential columns that must exist for core tables."""
+        essential_columns = {
+            'listings': {
+                'url', 'source', 'city', 'title', 'scraped_at', 'insert_ts'
+            },
+            'scraping_executions': {
+                'execution_id', 'started_at', 'status', 'city'
+            }
+        }
+        return essential_columns.get(table_name, set())

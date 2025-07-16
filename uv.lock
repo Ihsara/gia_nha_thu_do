@@ -1812,6 +1812,7 @@ dependencies = [
     { name = "owslib", version = "0.34.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pandas" },
     { name = "plotly" },
+    { name = "psutil" },
     { name = "pyarrow" },
     { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scikit-learn", version = "1.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -1825,6 +1826,11 @@ dependencies = [
 test = [
     { name = "pytest" },
     { name = "pytest-mock" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -1846,6 +1852,7 @@ requires-dist = [
     { name = "owslib", specifier = ">=0.30.0" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "plotly", specifier = ">=6.2.0" },
+    { name = "psutil", specifier = ">=7.0.0" },
     { name = "pyarrow", specifier = ">=15.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0" },
     { name = "pytest-mock", marker = "extra == 'test'", specifier = ">=3.12.0" },
@@ -1853,6 +1860,9 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.12.0" },
     { name = "selenium", specifier = ">=4.18.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.4.1" }]
 
 [[package]]
 name = "osmnx"

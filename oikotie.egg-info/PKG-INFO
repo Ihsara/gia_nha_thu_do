@@ -29,6 +29,7 @@ Requires-Dist: plotly>=6.2.0
 Requires-Dist: httpx>=0.27.0
 Requires-Dist: OWSLib>=0.30.0
 Requires-Dist: pyarrow>=15.0.0
+Requires-Dist: psutil>=7.0.0
 Provides-Extra: test
 Requires-Dist: pytest>=8.0.0; extra == "test"
 Requires-Dist: pytest-mock>=3.12.0; extra == "test"
@@ -65,9 +66,19 @@ The Oikotie Analytics Platform automates the collection of property listings fro
 - Cookie consent automation and website interaction
 - Configurable city-specific scraping parameters
 
+### 🛡️ **Enterprise Data Governance**
+- Production-ready batch processing for thousands of listings
+- Complete audit trails and API usage monitoring
+- Rate limiting compliance with open data portals
+- Quality scoring and data lineage tracking
+- Automated governance workflows with progress monitoring
+- Database-first strategy with comprehensive error handling
+
 ### 🗺️ **Geospatial Data Integration**
 - Automated address geocoding and standardization
-- Integration with Helsinki open data sources
+- Dual-source geodata: Finnish National WMS & Helsinki GeoPackage
+- 128 topographic layers including 59,426 building polygons
+- Abstract data source interface for seamless switching
 - Building footprint and parcel boundary processing
 - Topographic and infrastructure data enrichment
 

@@ -15,7 +15,7 @@ from loguru import logger
 import duckdb
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import queue
-from oikotie.utils import extract_postal_code
+from .utils import extract_postal_code
 
 # --- Loguru Configuration ---
 logger.remove()
