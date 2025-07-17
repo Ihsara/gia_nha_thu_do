@@ -1,16 +1,29 @@
 """
-Automation package for the Oikotie Real Estate Analytics Platform.
+Daily Scraper Automation Package
 
-This package provides automation capabilities including smart deduplication,
-listing management, and intelligent scraping orchestration.
+This package provides automation capabilities for the Oikotie scraper including:
+- Cluster coordination and distributed execution
+- Smart deduplication and scheduling
+- Status reporting and monitoring
+- Deployment management
 """
 
-from .deduplication import SmartDeduplicationManager
-from .listing_manager import ListingManager
-from .retry_manager import RetryManager
+from .cluster import (
+    ClusterCoordinator,
+    WorkItem,
+    WorkItemStatus,
+    HealthStatus,
+    NodeStatus,
+    WorkDistribution,
+    create_cluster_coordinator
+)
 
 __all__ = [
-    'SmartDeduplicationManager', 
-    'ListingManager', 
-    'RetryManager'
+    'ClusterCoordinator',
+    'WorkItem', 
+    'WorkItemStatus',
+    'HealthStatus',
+    'NodeStatus',
+    'WorkDistribution',
+    'create_cluster_coordinator'
 ]

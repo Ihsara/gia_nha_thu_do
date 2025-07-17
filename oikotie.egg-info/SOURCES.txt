@@ -14,7 +14,10 @@ oikotie.egg-info/entry_points.txt
 oikotie.egg-info/requires.txt
 oikotie.egg-info/top_level.txt
 oikotie/automation/__init__.py
+oikotie/automation/cli.py
+oikotie/automation/cluster.py
 oikotie/automation/deduplication.py
+oikotie/automation/deployment.py
 oikotie/automation/listing_manager.py
 oikotie/automation/orchestrator.py
 oikotie/automation/retry_manager.py
@@ -78,6 +81,7 @@ oikotie/visualization/utils/config.py
 oikotie/visualization/utils/data_loader.py
 oikotie/visualization/utils/geometry.py
 tests/test_dashboard.py
+tests/test_deployment_manager.py
 tests/test_enhanced_orchestrator.py
 tests/test_enhanced_orchestrator_simple.py
 tests/test_geolocation.py

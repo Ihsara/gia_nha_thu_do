@@ -1,0 +1,205 @@
+# Oikotie Scraper Cluster Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oikotie-scraper
+  namespace: oikotie-scraper
+  labels:
+    app: oikotie-scraper
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: oikotie-scraper
+  template:
+    metadata:
+      labels:
+        app: oikotie-scraper
+    spec:
+      containers:
+      - name: scraper
+        image: oikotie-scraper:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DEPLOYMENT_TYPE
+          value: "cluster"
+        - name: CLUSTER_COORDINATION_ENABLED
+          value: "true"
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        - name: DATABASE_PATH
+          value: "/shared/real_estate.duckdb"
+        - name: HEADLESS_BROWSER
+          value: "true"
+        - name: HEALTH_CHECK_ENABLED
+          value: "true"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: MAX_WORKERS
+          value: "3"
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        ports:
+        - containerPort: 8080
+          name: health
+        volumeMounts:
+        - name: shared-data
+          mountPath: /shared
+        - name: logs
+          mountPath: /logs
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - "sleep 15"  # Allow graceful shutdown
+      volumes:
+      - name: shared-data
+        persistentVolumeClaim:
+          claimName: scraper-shared-pvc
+      - name: logs
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: scraper-config
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 45
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oikotie-scraper
+  namespace: oikotie-scraper
+  labels:
+    app: oikotie-scraper
+spec:
+  selector:
+    app: oikotie-scraper
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: health
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scraper-shared-pvc
+  namespace: oikotie-scraper
+spec:
+  accessModes:
+  - ReadWriteMany  # Shared across multiple pods
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scraper-config
+  namespace: oikotie-scraper
+data:
+  config.json: |
+    {
+      "deployment": {
+        "health_check_port": 8080,
+        "database_path": "/shared/real_estate.duckdb",
+        "log_level": "INFO",
+        "max_workers": 3,
+        "headless_browser": true,
+        "enable_metrics": true,
+        "graceful_shutdown_timeout": 30
+      },
+      "tasks": [
+        {
+          "city": "Helsinki",
+          "enabled": true,
+          "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+          "max_detail_workers": 3,
+          "staleness_threshold_hours": 24,
+          "retry_limit": 3,
+          "batch_size": 50
+        }
+      ]
+    }
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: oikotie-scraper-hpa
+  namespace: oikotie-scraper
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: oikotie-scraper
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Service Monitor for Prometheus (if using Prometheus Operator)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: oikotie-scraper-metrics
+  namespace: oikotie-scraper
+  labels:
+    app: oikotie-scraper
+spec:
+  selector:
+    matchLabels:
+      app: oikotie-scraper
+  endpoints:
+  - port: health
+    path: /metrics
+    interval: 30s

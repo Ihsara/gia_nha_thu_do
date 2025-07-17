@@ -25,6 +25,9 @@ The Oikotie Analytics Platform automates the collection of property listings fro
 
 ### 🏠 **Automated Data Collection**
 - Multi-threaded web scraping of Oikotie.fi property listings
+- **Distributed cluster execution** with Redis-based coordination
+- **Smart deduplication** and intelligent work distribution
+- **Health monitoring** and automatic failure recovery
 - Intelligent rate limiting and error handling
 - Cookie consent automation and website interaction
 - Configurable city-specific scraping parameters
@@ -263,6 +266,37 @@ Edit `config/config.json` to customize scraping parameters:
 }
 ```
 
+### Distributed Cluster Execution
+
+For large-scale operations, the platform supports distributed execution across multiple nodes:
+
+```python
+from oikotie.automation.cluster import create_cluster_coordinator, WorkItem
+
+# Create cluster coordinator
+coordinator = create_cluster_coordinator("redis://localhost:6379")
+
+# Start health monitoring
+coordinator.start_health_monitoring()
+
+# Create and distribute work
+work_items = [
+    WorkItem(work_id="helsinki-1", city="Helsinki", url="https://..."),
+    WorkItem(work_id="espoo-1", city="Espoo", url="https://...")
+]
+
+result = coordinator.distribute_work(work_items)
+print(f"Distributed {result.distributed_items} items across cluster")
+```
+
+**Cluster Features:**
+- **Redis-based coordination** for work distribution
+- **Distributed locking** to prevent duplicate work
+- **Health monitoring** with automatic failure detection
+- **Work redistribution** when nodes fail
+- **Exponential backoff** retry logic
+- **Graceful shutdown** with work preservation
+
 ### Jupyter Notebook Analysis
 
 The platform includes comprehensive Jupyter notebooks for data exploration:
@@ -317,6 +351,12 @@ Key modules and their functionality:
 - `oikotie.utils` - Utility functions and helpers
 - `oikotie.road_data` - Road network data processing
 
+#### Automation Package
+- `oikotie.automation.cluster` - **Redis-based cluster coordination**
+- `oikotie.automation.cluster.ClusterCoordinator` - **Distributed work management**
+- `oikotie.automation.cluster.WorkItem` - **Work unit representation**
+- `oikotie.automation.cluster.HealthStatus` - **Node health monitoring**
+
 #### Visualization Package
 - `oikotie.visualization.dashboard.enhanced` - Enhanced interactive dashboards
 - `oikotie.visualization.dashboard.builder` - Dashboard construction utilities
@@ -364,6 +404,9 @@ oikotie/
 ├── memory-bank/           # Project knowledge management
 ├── notebooks/             # Jupyter analysis notebooks
 ├── oikotie/              # Main Python package
+│   ├── automation/       # **Distributed execution system**
+│   │   ├── cluster.py    # **Redis-based cluster coordination**
+│   │   └── __init__.py   # **Automation package exports**
 │   ├── database/         # Database schema and models
 │   │   ├── schema.py     # Table definitions and relationships
 │   │   ├── models.py     # Data model classes

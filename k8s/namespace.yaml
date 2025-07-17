@@ -1,0 +1,8 @@
+# Kubernetes namespace for Oikotie Scraper
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oikotie-scraper
+  labels:
+    app: oikotie-scraper
+    version: v1.0.0
