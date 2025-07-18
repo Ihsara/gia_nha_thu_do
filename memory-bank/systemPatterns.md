@@ -100,6 +100,18 @@
 - **Implementation**: Prepare → Scrape → Enrich → Visualize
 - **Benefit**: Clear data flow and error handling
 
+### 6. Monitoring Pattern
+- **Context**: Long-running spatial processing tasks
+- **Implementation**: Real-time progress tracking with checkpoints
+- **Location**: `create_property_polygon_visualization_with_monitoring.py`
+- **Benefit**: Process monitoring, ETA calculations, resumable operations
+
+### 7. Git Workflow Pattern
+- **Context**: Professional Python development practices
+- **Implementation**: Feature branches, conventional commits, atomic changes
+- **Location**: `.clinerules/git-workflow.md`
+- **Benefit**: Version control, collaboration, code quality assurance
+
 ## Component Relationships
 
 ### Core Dependencies

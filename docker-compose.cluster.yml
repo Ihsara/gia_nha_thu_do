@@ -1,0 +1,136 @@
+# Docker Compose configuration for cluster deployment testing
+version: '3.8'
+
+services:
+  # Redis for cluster coordination
+  redis:
+    image: redis:7-alpine
+    container_name: scraper-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - scraper-network
+
+  # Scraper node 1
+  scraper-node-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cluster
+    container_name: scraper-node-1
+    environment:
+      - NODE_ID=scraper-node-1
+      - ENVIRONMENT=production
+      - DEPLOYMENT_TYPE=cluster
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_PATH=/shared/real_estate.duckdb
+      - HEALTH_CHECK_PORT=8080
+      - LOG_LEVEL=INFO
+      - HEADLESS_BROWSER=true
+      - MAX_WORKERS=3
+    ports:
+      - "8081:8080"
+    volumes:
+      - shared_data:/shared
+      - node1_logs:/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - scraper-network
+
+  # Scraper node 2
+  scraper-node-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cluster
+    container_name: scraper-node-2
+    environment:
+      - NODE_ID=scraper-node-2
+      - ENVIRONMENT=production
+      - DEPLOYMENT_TYPE=cluster
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_PATH=/shared/real_estate.duckdb
+      - HEALTH_CHECK_PORT=8080
+      - LOG_LEVEL=INFO
+      - HEADLESS_BROWSER=true
+      - MAX_WORKERS=3
+    ports:
+      - "8082:8080"
+    volumes:
+      - shared_data:/shared
+      - node2_logs:/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - scraper-network
+
+  # Load balancer (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: scraper-loadbalancer
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - scraper-node-1
+      - scraper-node-2
+    networks:
+      - scraper-network
+
+  # Monitoring (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: scraper-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - scraper-network
+
+volumes:
+  redis_data:
+    driver: local
+  shared_data:
+    driver: local
+  node1_logs:
+    driver: local
+  node2_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+
+networks:
+  scraper-network:
+    driver: bridge

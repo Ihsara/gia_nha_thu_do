@@ -1,0 +1,53 @@
+# Docker Compose for Oikotie Daily Scraper Automation
+# Standalone container deployment
+
+version: '3.8'
+
+services:
+  scraper:
+    build:
+      context: .
+      target: production
+    container_name: oikotie-scraper
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DEPLOYMENT_TYPE=container
+      - HEADLESS_BROWSER=true
+      - HEALTH_CHECK_ENABLED=true
+      - DATABASE_PATH=/data/real_estate.duckdb
+      - LOG_LEVEL=INFO
+      - MAX_WORKERS=5
+      - GRACEFUL_SHUTDOWN_TIMEOUT=30
+    volumes:
+      # Data persistence
+      - scraper_data:/data
+      - scraper_logs:/logs
+      - scraper_output:/output
+      # Configuration
+      - ./config:/app/config:ro
+    ports:
+      - "8080:8080"  # Health check endpoint
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  scraper_data:
+    driver: local
+  scraper_logs:
+    driver: local
+  scraper_output:
+    driver: local
+
+networks:
+  default:
+    name: oikotie-scraper-network
