@@ -23,6 +23,7 @@ from ..scraper import OikotieScraper, worker_scrape_details
 from .deduplication import SmartDeduplicationManager, DeduplicationSummary
 from .listing_manager import ListingManager, ProcessingStats, ListingBatch
 from .retry_manager import RetryManager, RetryConfiguration
+from .metrics import MetricsCollector
 
 
 class ExecutionStatus(Enum):
@@ -109,6 +110,9 @@ class EnhancedScraperOrchestrator:
             )
         )
         
+        # Initialize metrics collector
+        self.metrics_collector = MetricsCollector(self.db_manager)
+        
         logger.info(f"Enhanced scraper orchestrator initialized for {config.city}")
     
     def run_daily_scrape(self) -> ScrapingResult:
@@ -140,6 +144,9 @@ class EnhancedScraperOrchestrator:
         )
         
         try:
+            # Start metrics tracking
+            self.metrics_collector.start_execution_tracking(execution_id, self.config.city)
+            
             # Phase 1: Discover listing URLs
             logger.info("Phase 1: Discovering listing URLs")
             discovered_urls = self._discover_listing_urls()
@@ -188,11 +195,16 @@ class EnhancedScraperOrchestrator:
             # Phase 5: Performance monitoring and cleanup
             if self.config.enable_performance_monitoring:
                 result.memory_usage_mb = self._get_memory_usage()
+                # Collect performance metrics
+                performance_metrics = self.metrics_collector.collect_performance_metrics(execution_id)
             
             # Mark as completed
             result.status = ExecutionStatus.COMPLETED
             result.completed_at = datetime.now()
             result.execution_time_seconds = (result.completed_at - result.started_at).total_seconds()
+            
+            # Collect final execution metrics
+            execution_metrics = self.metrics_collector.collect_execution_metrics(result)
             
             # Update execution metadata
             execution_metadata.status = 'completed'

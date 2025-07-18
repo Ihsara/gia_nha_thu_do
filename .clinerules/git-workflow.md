@@ -2,27 +2,46 @@
 Git workflow rules for Python professional development establishing mandatory procedures for version control, branch management, commit practices, and code organization in the Oikotie project and all future Python projects.
 
 ## Git workflow standards
+- **NEVER DEVELOP ON MAIN**: All development MUST occur on feature branches - main branch is protected
 - **Feature branches**: All new features MUST be developed on dedicated feature branches (feature/description-name)
+- **Spec document branches**: All spec work (requirements, design, tasks) MUST use spec-specific branch naming
+- **Steering document branches**: All steering rule updates MUST use dedicated branches
 - **Commit frequency**: Commit work incrementally with logical, atomic changes
 - **Commit messages**: Use conventional commits format: type(scope): description
 - **Code review**: All changes MUST go through proper review process before merging
 - **Clean history**: Use interactive rebase to clean up commit history before merging
 - **Documentation commits**: Documentation updates MUST be committed with related code changes
+- **Pull Request Required**: Every task MUST end with a pull request to main - no direct commits to main
 
 ## Branch naming conventions
 ### Mandatory branch prefixes:
 - `feature/`: New features or enhancements (feature/polygon-monitoring-workflow)
 - `fix/`: Bug fixes and issue resolution (fix/spatial-join-match-rate)
 - `docs/`: Documentation-only changes (docs/monitoring-workflow-guide)
+- `spec/`: Spec document work (spec/daily-scraper-automation-requirements)
+- `steering/`: Steering rule updates (steering/add-git-workflow-rules)
 - `refactor/`: Code refactoring without functionality changes
 - `test/`: Test additions or improvements
 - `chore/`: Maintenance tasks, dependency updates, tooling
+
+### Spec document branch naming convention (MANDATORY):
+- **Requirements**: `spec/{feature-name}-requirements`
+- **Design**: `spec/{feature-name}-design` 
+- **Tasks**: `spec/{feature-name}-tasks`
+- **Full spec**: `spec/{feature-name}-complete` (for all three documents)
+- **Task execution**: `feature/{feature-name}-task-{task-number}` (e.g., feature/daily-scraper-automation-task-1-1)
+
+### Steering document branch naming convention (MANDATORY):
+- **New rules**: `steering/add-{rule-name}`
+- **Rule updates**: `steering/update-{rule-name}`
+- **Rule removal**: `steering/remove-{rule-name}`
 
 ### Branch naming rules:
 - Use lowercase with hyphens for separation
 - Be descriptive but concise (max 50 characters)
 - Include issue number when applicable: feature/123-polygon-visualization
-- Branch from main/master for features, from develop for collaborative work
+- Branch from main for all work - NEVER develop on main directly
+- Feature name must match the spec directory name exactly
 
 ## Commit message standards
 ### Conventional commit format (MANDATORY):
@@ -70,13 +89,32 @@ chore(deps): update shapely to latest version for geometry processing
 
 ## Development workflow integration
 ### Task completion workflow:
-1. **Create feature branch**: `git checkout -b feature/task-description`
+1. **Create feature branch**: `git checkout -b feature/task-description` (NEVER work on main)
 2. **Implement changes**: Make incremental commits as work progresses
 3. **Update documentation**: Commit documentation updates with related code
 4. **Prepare for merge**: Clean up commit history, ensure tests pass
 5. **Create commit summary**: Write comprehensive commit message
 6. **MANDATORY TASK COMPLETION COMMIT**: Every completed task MUST end with a git commit
-7. **Push and review**: Push branch and create pull request if applicable
+7. **Push branch**: `git push origin feature/task-description`
+8. **MANDATORY PULL REQUEST**: Create pull request to main branch
+9. **Definition of Done**: Task is NOT complete until pull request is created and ready for review
+
+### Definition of Done (MANDATORY):
+Every task completion MUST include:
+- [ ] All code changes committed to feature branch
+- [ ] Documentation updated and committed
+- [ ] Memory Bank updated (if applicable)
+- [ ] Feature branch pushed to remote
+- [ ] **Pull Request created to main branch**
+- [ ] Pull request includes comprehensive description of changes
+- [ ] Pull request is ready for review (no draft status)
+
+### Pull Request Requirements:
+- **Title**: Follow conventional commit format: `type(scope): description`
+- **Description**: Include what was implemented, why, and any testing done
+- **Reviewers**: Assign appropriate reviewers (or self-review for solo work)
+- **Labels**: Apply relevant labels (feature, bug, documentation, etc.)
+- **Linked Issues**: Reference any related issues or spec tasks
 
 ### Mandatory task completion commit requirements:
 - **EVERY TASK**: Must end with a git commit regardless of task size or scope

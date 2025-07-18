@@ -18,6 +18,7 @@ from loguru import logger
 from .deployment import DeploymentManager, DeploymentType, create_deployment_manager
 from .orchestrator import EnhancedScraperOrchestrator, load_config_and_create_orchestrators
 from .cluster import ClusterCoordinator, create_cluster_coordinator, NodeHealth, NodeStatus
+from .status_cli import status as status_commands
 
 
 @click.group()
@@ -318,8 +319,8 @@ def run_interactive_mode(deployment_manager: DeploymentManager, city: Optional[s
 
 @cli.command()
 @click.pass_context
-def status(ctx):
-    """Show system status and health information."""
+def system_status(ctx):
+    """Show system deployment status and health information."""
     try:
         deployment_manager = create_deployment_manager(ctx.obj.get('config_path'))
         config = deployment_manager.get_configuration()
@@ -342,6 +343,10 @@ def status(ctx):
     except Exception as e:
         logger.error(f"Failed to get status: {e}")
         sys.exit(1)
+
+
+# Add status reporting commands as a subgroup
+cli.add_command(status_commands, name='reports')
 
 
 @cli.command()
