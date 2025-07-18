@@ -587,3 +587,173 @@ class EnhancedDatabaseManager:
         except Exception as e:
             logger.error(f"Failed to get execution history: {e}")
             return []
+    
+    def get_latest_execution(self, city: str, report_date: datetime) -> Optional[Dict[str, Any]]:
+        """Get the latest execution for a city on or before the report date."""
+        try:
+            with duckdb.connect(str(self.db_path), read_only=True) as con:
+                result = con.execute("""
+                    SELECT execution_id, started_at, completed_at, status, city,
+                           listings_processed, listings_new, listings_updated,
+                           listings_skipped, listings_failed, execution_time_seconds,
+                           memory_usage_mb, error_summary
+                    FROM scraping_executions
+                    WHERE city = ? AND DATE(started_at) <= DATE(?)
+                    ORDER BY started_at DESC
+                    LIMIT 1
+                """, [city, report_date]).fetchone()
+                
+                if result:
+                    return {
+                        'execution_id': result[0],
+                        'started_at': result[1],
+                        'completed_at': result[2],
+                        'status': result[3],
+                        'city': result[4],
+                        'listings_processed': result[5] or 0,
+                        'listings_new': result[6] or 0,
+                        'listings_updated': result[7] or 0,
+                        'listings_skipped': result[8] or 0,
+                        'listings_failed': result[9] or 0,
+                        'execution_time_seconds': result[10],
+                        'memory_usage_mb': result[11],
+                        'error_summary': result[12]
+                    }
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to get latest execution for {city}: {e}")
+            return None
+    
+    def get_data_quality_metrics(self, city: str, execution_id: str) -> Dict[str, Any]:
+        """Get data quality metrics for a specific city and execution."""
+        try:
+            with duckdb.connect(str(self.db_path), read_only=True) as con:
+                # Get total addresses for the city
+                total_result = con.execute("""
+                    SELECT COUNT(*) FROM listings 
+                    WHERE city = ? AND deleted_ts IS NULL
+                """, [city]).fetchone()
+                total_addresses = total_result[0] if total_result else 0
+                
+                # Get geocoded addresses
+                geocoded_result = con.execute("""
+                    SELECT COUNT(*) FROM listings 
+                    WHERE city = ? AND deleted_ts IS NULL 
+                    AND address IS NOT NULL AND address != ''
+                """, [city]).fetchone()
+                geocoded_addresses = geocoded_result[0] if geocoded_result else 0
+                
+                # Get complete listings (with all major fields)
+                complete_result = con.execute("""
+                    SELECT COUNT(*) FROM listings 
+                    WHERE city = ? AND deleted_ts IS NULL 
+                    AND address IS NOT NULL AND price_eur IS NOT NULL 
+                    AND size_m2 IS NOT NULL AND rooms IS NOT NULL
+                """, [city]).fetchone()
+                complete_listings = complete_result[0] if complete_result else 0
+                
+                # Get validation errors (simplified - would need error tracking)
+                validation_errors = []
+                
+                # Get duplicate count (simplified)
+                duplicate_result = con.execute("""
+                    SELECT COUNT(*) - COUNT(DISTINCT url) FROM listings 
+                    WHERE city = ? AND deleted_ts IS NULL
+                """, [city]).fetchone()
+                duplicate_listings = max(0, duplicate_result[0] if duplicate_result else 0)
+                
+                # Get spatial matches (would need spatial data integration)
+                spatial_matches = geocoded_addresses  # Simplified assumption
+                
+                return {
+                    'total_addresses': total_addresses,
+                    'geocoded_addresses': geocoded_addresses,
+                    'complete_listings': complete_listings,
+                    'incomplete_listings': total_addresses - complete_listings,
+                    'valid_listings': complete_listings,  # Simplified
+                    'invalid_listings': 0,  # Would need validation tracking
+                    'duplicate_listings': duplicate_listings,
+                    'spatial_matches': spatial_matches,
+                    'validation_errors': validation_errors
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to get data quality metrics for {city}: {e}")
+            return {
+                'total_addresses': 0,
+                'geocoded_addresses': 0,
+                'complete_listings': 0,
+                'incomplete_listings': 0,
+                'valid_listings': 0,
+                'invalid_listings': 0,
+                'duplicate_listings': 0,
+                'spatial_matches': 0,
+                'validation_errors': []
+            }
+    
+    def get_execution_errors(self, execution_id: str) -> List[Dict[str, Any]]:
+        """Get error logs for a specific execution."""
+        # This is a simplified implementation
+        # In a full system, this would query a separate error log table
+        try:
+            with duckdb.connect(str(self.db_path), read_only=True) as con:
+                result = con.execute("""
+                    SELECT error_summary FROM scraping_executions 
+                    WHERE execution_id = ? AND error_summary IS NOT NULL
+                """, [execution_id]).fetchone()
+                
+                if result and result[0]:
+                    # Parse error summary into structured format
+                    return [{
+                        'message': result[0],
+                        'level': 'ERROR',
+                        'timestamp': datetime.now().isoformat()
+                    }]
+                
+                return []
+                
+        except Exception as e:
+            logger.error(f"Failed to get execution errors: {e}")
+            return []
+    
+    def get_execution_history(self, city: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+        """Get execution history for a city within a date range."""
+        try:
+            with duckdb.connect(str(self.db_path), read_only=True) as con:
+                result = con.execute("""
+                    SELECT execution_id, started_at, completed_at, status,
+                           listings_processed, listings_new, listings_failed,
+                           execution_time_seconds, memory_usage_mb
+                    FROM scraping_executions
+                    WHERE city = ? AND started_at >= ? AND started_at <= ?
+                    ORDER BY started_at DESC
+                """, [city, start_date, end_date]).fetchall()
+                
+                executions = []
+                for row in result:
+                    processed = row[4] or 0
+                    failed = row[6] or 0
+                    success_rate = (processed - failed) / processed if processed > 0 else 0
+                    error_rate = failed / processed if processed > 0 else 0
+                    
+                    executions.append({
+                        'execution_id': row[0],
+                        'started_at': row[1],
+                        'completed_at': row[2],
+                        'status': row[3],
+                        'listings_processed': processed,
+                        'listings_new': row[5] or 0,
+                        'listings_failed': failed,
+                        'execution_time_seconds': row[7] or 0,
+                        'memory_usage_mb': row[8] or 0,
+                        'success_rate': success_rate,
+                        'error_rate': error_rate,
+                        'data_quality_score': 0.9  # Simplified - would calculate from data
+                    })
+                
+                return executions
+                
+        except Exception as e:
+            logger.error(f"Failed to get execution history for {city}: {e}")
+            return []

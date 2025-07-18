@@ -19,8 +19,11 @@ oikotie/automation/cluster.py
 oikotie/automation/deduplication.py
 oikotie/automation/deployment.py
 oikotie/automation/listing_manager.py
+oikotie/automation/metrics.py
 oikotie/automation/orchestrator.py
+oikotie/automation/reporting.py
 oikotie/automation/retry_manager.py
+oikotie/automation/status_cli.py
 oikotie/data/__init__.py
 oikotie/data/batch_governance_processor.py
 oikotie/data/listing_data_manager.py
@@ -80,9 +83,11 @@ oikotie/visualization/utils/building_analyzer.py
 oikotie/visualization/utils/config.py
 oikotie/visualization/utils/data_loader.py
 oikotie/visualization/utils/geometry.py
+tests/test_cluster_coordination.py
 tests/test_dashboard.py
 tests/test_deployment_manager.py
 tests/test_enhanced_orchestrator.py
 tests/test_enhanced_orchestrator_simple.py
 tests/test_geolocation.py
 tests/test_scraper.py
+tests/test_status_reporting_system.py
