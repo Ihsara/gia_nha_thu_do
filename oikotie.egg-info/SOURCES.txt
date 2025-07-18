@@ -19,7 +19,10 @@ oikotie/automation/alert_config.py
 oikotie/automation/alerting.py
 oikotie/automation/cli.py
 oikotie/automation/cluster.py
+oikotie/automation/config.py
+oikotie/automation/config_cli.py
 oikotie/automation/config_manager.py
+oikotie/automation/config_validator.py
 oikotie/automation/deduplication.py
 oikotie/automation/deployment.py
 oikotie/automation/listing_manager.py
@@ -27,6 +30,8 @@ oikotie/automation/metrics.py
 oikotie/automation/orchestrator.py
 oikotie/automation/reporting.py
 oikotie/automation/retry_manager.py
+oikotie/automation/scheduler.py
+oikotie/automation/scheduler_cli.py
 oikotie/automation/status_cli.py
 oikotie/data/__init__.py
 oikotie/data/batch_governance_processor.py
@@ -88,10 +93,12 @@ oikotie/visualization/utils/config.py
 oikotie/visualization/utils/data_loader.py
 oikotie/visualization/utils/geometry.py
 tests/test_cluster_coordination.py
+tests/test_config_management.py
 tests/test_dashboard.py
 tests/test_deployment_manager.py
 tests/test_enhanced_orchestrator.py
 tests/test_enhanced_orchestrator_simple.py
 tests/test_geolocation.py
+tests/test_scheduler.py
 tests/test_scraper.py
 tests/test_status_reporting_system.py
