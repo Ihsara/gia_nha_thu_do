@@ -348,6 +348,10 @@ def system_status(ctx):
 # Add status reporting commands as a subgroup
 cli.add_command(status_commands, name='reports')
 
+# Add alert management commands as a subgroup
+from .alert_cli import alerts as alert_commands
+cli.add_command(alert_commands, name='alerts')
+
 
 @cli.command()
 @click.option('--output', '-o', type=click.Path(), help='Output file path')

@@ -38,6 +38,7 @@ dependencies = [
     "psutil>=7.0.0",
     "redis>=6.2.0",
     "flask>=3.1.1",
+    "watchdog>=6.0.0",
 ]
 
 [project.optional-dependencies]

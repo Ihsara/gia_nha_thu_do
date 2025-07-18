@@ -1,0 +1,48 @@
+{
+  "_comment": "Basic configuration template for standalone deployment",
+  "tasks": [
+    {
+      "city": "Helsinki",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "enabled": true,
+      "listing_limit": null,
+      "max_detail_workers": 5,
+      "staleness_hours": 24,
+      "retry_count": 3,
+      "retry_backoff_factor": 2.0
+    },
+    {
+      "city": "Espoo",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B49,6,%22Espoo%22%5D%5D&cardType=100",
+      "enabled": false,
+      "listing_limit": 100,
+      "max_detail_workers": 3,
+      "staleness_hours": 24
+    }
+  ],
+  "database": {
+    "path": "data/real_estate.duckdb",
+    "connection_timeout": 30,
+    "max_connections": 10,
+    "backup_enabled": true,
+    "backup_interval_hours": 24
+  },
+  "monitoring": {
+    "metrics_enabled": true,
+    "prometheus_port": 8000,
+    "health_check_port": 8001,
+    "log_level": "INFO",
+    "log_file_retention": 30,
+    "alert_channels": ["email"]
+  },
+  "scheduling": {
+    "enabled": true,
+    "cron_expression": "0 6 * * *",
+    "timezone": "Europe/Helsinki",
+    "max_execution_time": 7200,
+    "concurrent_tasks": 1
+  },
+  "deployment_type": "standalone",
+  "environment": "production",
+  "debug": false
+}

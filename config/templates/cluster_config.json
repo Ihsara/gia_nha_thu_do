@@ -1,0 +1,58 @@
+{
+  "_comment": "Cluster deployment configuration template",
+  "tasks": [
+    {
+      "city": "Helsinki",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "enabled": true,
+      "max_detail_workers": 3,
+      "staleness_hours": 24
+    },
+    {
+      "city": "Espoo",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B49,6,%22Espoo%22%5D%5D&cardType=100",
+      "enabled": true,
+      "max_detail_workers": 3,
+      "staleness_hours": 24
+    },
+    {
+      "city": "Vantaa",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B92,6,%22Vantaa%22%5D%5D&cardType=100",
+      "enabled": true,
+      "max_detail_workers": 3,
+      "staleness_hours": 24
+    }
+  ],
+  "database": {
+    "path": "/data/real_estate.duckdb",
+    "connection_timeout": 60,
+    "max_connections": 20
+  },
+  "cluster": {
+    "enabled": true,
+    "redis_host": "redis-service",
+    "redis_port": 6379,
+    "redis_db": 0,
+    "redis_password": null,
+    "node_id": null,
+    "heartbeat_interval": 30,
+    "work_lock_ttl": 300
+  },
+  "monitoring": {
+    "metrics_enabled": true,
+    "prometheus_port": 8000,
+    "health_check_port": 8001,
+    "log_level": "INFO",
+    "alert_channels": ["slack", "email"]
+  },
+  "scheduling": {
+    "enabled": true,
+    "cron_expression": "0 6 * * *",
+    "timezone": "Europe/Helsinki",
+    "max_execution_time": 10800,
+    "concurrent_tasks": 3
+  },
+  "deployment_type": "cluster",
+  "environment": "production",
+  "debug": false
+}

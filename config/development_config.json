@@ -1,0 +1,26 @@
+{
+  "_comment": "Development environment overrides",
+  "tasks": [
+    {
+      "city": "Helsinki",
+      "enabled": true,
+      "listing_limit": 20,
+      "max_detail_workers": 2,
+      "staleness_hours": 1
+    }
+  ],
+  "database": {
+    "path": "data/dev_real_estate.duckdb",
+    "connection_timeout": 15,
+    "backup_enabled": false
+  },
+  "monitoring": {
+    "log_level": "DEBUG",
+    "log_file_retention": 7,
+    "alert_channels": []
+  },
+  "scheduling": {
+    "enabled": false
+  },
+  "debug": true
+}

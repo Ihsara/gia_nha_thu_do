@@ -14,8 +14,12 @@ oikotie.egg-info/entry_points.txt
 oikotie.egg-info/requires.txt
 oikotie.egg-info/top_level.txt
 oikotie/automation/__init__.py
+oikotie/automation/alert_cli.py
+oikotie/automation/alert_config.py
+oikotie/automation/alerting.py
 oikotie/automation/cli.py
 oikotie/automation/cluster.py
+oikotie/automation/config_manager.py
 oikotie/automation/deduplication.py
 oikotie/automation/deployment.py
 oikotie/automation/listing_manager.py

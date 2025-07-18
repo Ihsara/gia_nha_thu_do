@@ -1,0 +1,58 @@
+{
+  "_comment": "Container deployment configuration template",
+  "_documentation": {
+    "description": "This template provides configuration optimized for Docker container deployment",
+    "usage": "Use this configuration when deploying as a Docker container",
+    "volumes": ["/data for database storage", "/config for configuration files", "/logs for log files"],
+    "environment_variables": ["SCRAPER_LOG_LEVEL", "SCRAPER_DB_PATH", "SCRAPER_REDIS_HOST"]
+  },
+  
+  "tasks": [
+    {
+      "_comment": "Container-optimized task configuration",
+      "city": "Helsinki",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "enabled": true,
+      "max_detail_workers": 4,
+      "staleness_hours": 24
+    }
+  ],
+  
+  "database": {
+    "_comment": "Container volume-mounted database",
+    "path": "/data/real_estate.duckdb",
+    "connection_timeout": 30,
+    "max_connections": 8,
+    "backup_enabled": true,
+    "backup_interval_hours": 24
+  },
+  
+  "monitoring": {
+    "_comment": "Container-friendly monitoring (stdout logging)",
+    "metrics_enabled": true,
+    "prometheus_port": 8000,
+    "health_check_port": 8080,
+    "log_level": "INFO",
+    "log_file": null,
+    "alert_channels": ["webhook"]
+  },
+  
+  "scheduling": {
+    "_comment": "Container scheduling configuration",
+    "enabled": true,
+    "cron_expression": "0 3 * * *",
+    "timezone": "UTC",
+    "max_execution_time": 7200
+  },
+  
+  "cluster": {
+    "_comment": "Optional cluster support via environment variables",
+    "enabled": false,
+    "redis_host": "redis",
+    "redis_port": 6379
+  },
+  
+  "deployment_type": "container",
+  "environment": "production",
+  "debug": false
+}

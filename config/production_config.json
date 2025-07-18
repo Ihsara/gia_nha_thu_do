@@ -1,0 +1,40 @@
+{
+  "_comment": "Production environment overrides",
+  "tasks": [
+    {
+      "city": "Helsinki",
+      "enabled": true,
+      "max_detail_workers": 8,
+      "staleness_hours": 24
+    },
+    {
+      "city": "Espoo", 
+      "enabled": true,
+      "max_detail_workers": 6,
+      "staleness_hours": 24
+    },
+    {
+      "city": "Vantaa",
+      "enabled": true,
+      "max_detail_workers": 4,
+      "staleness_hours": 24
+    }
+  ],
+  "database": {
+    "connection_timeout": 60,
+    "max_connections": 15,
+    "backup_enabled": true,
+    "backup_interval_hours": 12
+  },
+  "monitoring": {
+    "log_level": "INFO",
+    "log_file_retention": 90,
+    "alert_channels": ["email", "slack"]
+  },
+  "scheduling": {
+    "enabled": true,
+    "cron_expression": "0 6 * * *",
+    "max_execution_time": 14400
+  },
+  "debug": false
+}

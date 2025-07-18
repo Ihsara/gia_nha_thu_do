@@ -1,0 +1,36 @@
+{
+  "_comment": "Development environment configuration template",
+  "tasks": [
+    {
+      "city": "Helsinki",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "enabled": true,
+      "listing_limit": 10,
+      "max_detail_workers": 2,
+      "staleness_hours": 1,
+      "retry_count": 2
+    }
+  ],
+  "database": {
+    "path": "data/test_real_estate.duckdb",
+    "connection_timeout": 15,
+    "backup_enabled": false
+  },
+  "monitoring": {
+    "metrics_enabled": true,
+    "prometheus_port": 8000,
+    "health_check_port": 8001,
+    "log_level": "DEBUG",
+    "log_file_retention": 7,
+    "alert_channels": []
+  },
+  "scheduling": {
+    "enabled": false,
+    "cron_expression": "*/5 * * * *",
+    "timezone": "Europe/Helsinki",
+    "max_execution_time": 300
+  },
+  "deployment_type": "standalone",
+  "environment": "development",
+  "debug": true
+}

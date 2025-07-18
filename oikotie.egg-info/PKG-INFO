@@ -32,6 +32,7 @@ Requires-Dist: pyarrow>=15.0.0
 Requires-Dist: psutil>=7.0.0
 Requires-Dist: redis>=6.2.0
 Requires-Dist: flask>=3.1.1
+Requires-Dist: watchdog>=6.0.0
 Provides-Extra: test
 Requires-Dist: pytest>=8.0.0; extra == "test"
 Requires-Dist: pytest-mock>=3.12.0; extra == "test"
