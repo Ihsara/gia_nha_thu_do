@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oikotie-scraper.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oikotie-scraper.labels" . | nindent 4 }}
+data:
+  config.json: |
+    {
+      "deployment": {
+        "health_check_port": {{ .Values.service.port }},
+        "database_path": {{ .Values.app.database.path | quote }},
+        "log_level": {{ .Values.app.logLevel | quote }},
+        "max_workers": {{ .Values.app.maxWorkers }},
+        "headless_browser": {{ .Values.app.headlessBrowser }},
+        "enable_metrics": {{ .Values.monitoring.enabled }},
+        "graceful_shutdown_timeout": {{ .Values.app.gracefulShutdownTimeout }}
+      },
+      "scraping": {
+        "staleness_threshold_hours": {{ .Values.app.scraping.stalenessThresholdHours }},
+        "retry_limit": {{ .Values.app.scraping.retryLimit }},
+        "batch_size": {{ .Values.app.scraping.batchSize }}
+      },
+      "tasks": [
+        {{- range $index, $city := .Values.app.cities }}
+        {{- if $index }},{{ end }}
+        {
+          "city": {{ $city.name | quote }},
+          "enabled": {{ $city.enabled }},
+          "url": {{ $city.url | quote }},
+          "max_detail_workers": {{ $city.maxDetailWorkers | default 3 }}
+        }
+        {{- end }}
+      ]
+    }
+  {{- with .Values.config.files }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}

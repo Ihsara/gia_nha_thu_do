@@ -1,0 +1,20 @@
+{
+  "enabled": false,
+  "name": "Code Quality Analyzer",
+  "description": "Monitors source code files for changes and provides automated code quality analysis including code smells, design patterns, best practices, readability, maintainability, and performance optimization suggestions",
+  "version": "1",
+  "when": {
+    "type": "userTriggered",
+    "patterns": [
+      "*.py",
+      "oikotie/**/*.py",
+      "tests/**/*.py",
+      "quickcheck/**/*.py",
+      "tmp/**/*.py"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the modified Python code files for potential improvements. Focus on:\n\n1. **Code Smells**: Identify long methods, large classes, duplicate code, complex conditionals, and other anti-patterns\n2. **Design Patterns**: Suggest appropriate design patterns where beneficial (Factory, Strategy, Observer, etc.)\n3. **Best Practices**: Check for proper error handling, type hints, documentation, logging practices\n4. **Readability**: Assess variable naming, function clarity, code organization, and comment quality\n5. **Maintainability**: Evaluate modularity, coupling, cohesion, and testability\n6. **Performance**: Identify potential bottlenecks, inefficient algorithms, memory usage issues\n\nFor each issue found, provide:\n- Clear description of the problem\n- Specific location (file:line if possible)\n- Concrete improvement suggestion\n- Code example when helpful\n- Priority level (High/Medium/Low)\n\nConsider the project context:\n- This is a geospatial data processing platform using DuckDB, GeoPandas, and web scraping\n- Code should follow the project's standards for type hints, error handling with loguru, and DuckDB usage\n- Focus on improvements that maintain existing functionality while enhancing code quality\n\nPrioritize suggestions that will have the most impact on code maintainability and reliability."
+  }
+}

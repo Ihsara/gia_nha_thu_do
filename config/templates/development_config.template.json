@@ -1,0 +1,48 @@
+{
+  "_comment": "Development environment configuration template",
+  "_documentation": {
+    "description": "This template provides configuration optimized for development and testing",
+    "usage": "Copy this file to config/development_config.json for development overrides",
+    "features": ["Debug logging", "Reduced workers", "Disabled scheduling", "Local paths"]
+  },
+  
+  "tasks": [
+    {
+      "_comment": "Limited scope for development testing",
+      "city": "Helsinki",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "enabled": true,
+      "listing_limit": 20,
+      "max_detail_workers": 2,
+      "staleness_hours": 1
+    }
+  ],
+  
+  "database": {
+    "_comment": "Development database configuration",
+    "path": "data/dev_real_estate.duckdb",
+    "connection_timeout": 15,
+    "backup_enabled": false
+  },
+  
+  "monitoring": {
+    "_comment": "Debug-level monitoring for development",
+    "log_level": "DEBUG",
+    "log_file_retention": 7,
+    "alert_channels": []
+  },
+  
+  "scheduling": {
+    "_comment": "Scheduling disabled for manual testing",
+    "enabled": false
+  },
+  
+  "cluster": {
+    "_comment": "Cluster disabled for development",
+    "enabled": false
+  },
+  
+  "deployment_type": "standalone",
+  "environment": "development",
+  "debug": true
+}

@@ -24,6 +24,9 @@ from .deduplication import SmartDeduplicationManager, DeduplicationSummary
 from .listing_manager import ListingManager, ProcessingStats, ListingBatch
 from .retry_manager import RetryManager, RetryConfiguration
 from .metrics import MetricsCollector
+from .monitoring import ComprehensiveMonitor
+from .logging_config import create_monitoring_context, log_execution_start, log_performance_metric
+from .data_governance import DataGovernanceManager, DataSource
 
 
 class ExecutionStatus(Enum):
@@ -112,6 +115,19 @@ class EnhancedScraperOrchestrator:
         
         # Initialize metrics collector
         self.metrics_collector = MetricsCollector(self.db_manager)
+        
+        # Initialize comprehensive monitor if performance monitoring is enabled
+        self.comprehensive_monitor: Optional[ComprehensiveMonitor] = None
+        if config.enable_performance_monitoring:
+            try:
+                self.comprehensive_monitor = ComprehensiveMonitor(
+                    db_manager=self.db_manager,
+                    metrics_port=8080 + hash(config.city) % 1000,  # Unique port per city
+                    system_monitor_interval=30
+                )
+                logger.info(f"Comprehensive monitoring enabled for {config.city}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize comprehensive monitoring: {e}")
         
         logger.info(f"Enhanced scraper orchestrator initialized for {config.city}")
     

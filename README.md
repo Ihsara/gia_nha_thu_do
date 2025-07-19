@@ -337,9 +337,38 @@ The platform includes comprehensive Jupyter notebooks for data exploration:
 
 Comprehensive documentation is available in the `docs/` directory:
 
+### Core Documentation
 - **[Dashboard Documentation](docs/DASHBOARD.md)** - Interactive dashboard usage
 - **[Script Documentation](docs/scripts/)** - Detailed script references
 - **[Workflow Documentation](docs/scripts/run_workflow.md)** - Complete workflow guide
+
+### Deployment Documentation
+- **[Deployment Guide](docs/deployment/)** - Complete deployment documentation
+- **[Configuration Examples](docs/deployment/configuration-examples.md)** - Ready-to-use configurations
+- **[Troubleshooting Guide](docs/deployment/troubleshooting-guide.md)** - Common issues and solutions
+- **[Operational Runbooks](docs/deployment/operational-runbooks.md)** - Step-by-step procedures
+
+### Deployment Options
+The system supports multiple deployment architectures:
+
+| Deployment Type | Use Case | Documentation |
+|----------------|----------|---------------|
+| **Standalone** | Development, testing | [Standalone Guide](docs/deployment/README.md#standalone-deployment) |
+| **Docker Container** | Single-node production | [Container Guide](docs/deployment/README.md#container-deployment) |
+| **Kubernetes** | Cloud-native, scalable | [Kubernetes Guide](docs/deployment/README.md#kubernetes-deployment) |
+| **Helm Chart** | Flexible K8s deployment | [Helm Guide](docs/deployment/README.md#helm-deployment) |
+
+#### Quick Deployment
+```bash
+# Docker Compose (Production-ready)
+docker-compose up -d
+
+# Kubernetes with Helm
+helm install oikotie-scraper k8s/helm/oikotie-scraper/
+
+# Standalone (Development)
+uv run python -m oikotie.automation.cli run --daily
+```
 
 ### API Reference
 

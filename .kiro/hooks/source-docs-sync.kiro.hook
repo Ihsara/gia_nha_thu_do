@@ -1,0 +1,27 @@
+{
+  "enabled": true,
+  "name": "Source to Docs Sync",
+  "description": "Monitors all Python source files, configuration files, and project structure changes to automatically update documentation in README.md and docs/ folder",
+  "version": "1",
+  "when": {
+    "type": "userTriggered",
+    "patterns": [
+      "*.py",
+      "oikotie/**/*.py",
+      "tests/**/*.py",
+      "quickcheck/*.py",
+      "tmp/*.py",
+      "config/*.json",
+      "pyproject.toml",
+      "docker-compose.yml",
+      "Dockerfile",
+      "k8s/*.yaml",
+      ".clinerules/*.md",
+      "memory-bank/*.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Source code or configuration files have been modified. Please review the changes and update the documentation accordingly:\n\n1. Update README.md if there are new features, changed workflows, or modified setup instructions\n2. Update relevant files in the docs/ folder for any architectural changes, new scripts, or modified processes\n3. Ensure all code examples in documentation are still accurate\n4. Update any API documentation if interfaces have changed\n5. Check if memory-bank files need updates for significant changes\n\nFocus on keeping documentation synchronized with the current codebase and maintaining accuracy of all examples and instructions."
+  }
+}

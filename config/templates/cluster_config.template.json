@@ -1,0 +1,71 @@
+{
+  "_comment": "Cluster deployment configuration template for daily scraper automation",
+  "_documentation": {
+    "description": "This template provides configuration for distributed cluster deployment",
+    "usage": "Copy this file to config/scraper_config.json and modify Redis settings",
+    "prerequisites": ["Redis server", "Shared storage for DuckDB", "Load balancer (optional)"],
+    "scaling": "Add more nodes by deploying with same Redis configuration"
+  },
+  
+  "tasks": [
+    {
+      "_comment": "Reduced workers per node for cluster deployment",
+      "city": "Helsinki",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "enabled": true,
+      "max_detail_workers": 3,
+      "staleness_hours": 24
+    },
+    {
+      "city": "Espoo",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B49,6,%22Espoo%22%5D%5D&cardType=100",
+      "enabled": true,
+      "max_detail_workers": 3,
+      "staleness_hours": 24
+    }
+  ],
+  
+  "database": {
+    "_comment": "Shared database configuration for cluster",
+    "path": "/shared/data/real_estate.duckdb",
+    "connection_timeout": 60,
+    "max_connections": 15,
+    "backup_enabled": true,
+    "backup_interval_hours": 12
+  },
+  
+  "cluster": {
+    "_comment": "Cluster coordination configuration",
+    "enabled": true,
+    "redis_host": "redis-service",
+    "redis_port": 6379,
+    "redis_db": 0,
+    "redis_password": null,
+    "node_id": null,
+    "heartbeat_interval": 30,
+    "work_lock_ttl": 300
+  },
+  
+  "monitoring": {
+    "_comment": "Enhanced monitoring for cluster deployment",
+    "metrics_enabled": true,
+    "prometheus_port": 8000,
+    "health_check_port": 8001,
+    "log_level": "INFO",
+    "log_file_retention": 90,
+    "alert_channels": ["email", "slack"]
+  },
+  
+  "scheduling": {
+    "_comment": "Coordinated scheduling across cluster",
+    "enabled": true,
+    "cron_expression": "0 2 * * *",
+    "timezone": "Europe/Helsinki",
+    "max_execution_time": 14400,
+    "concurrent_tasks": 2
+  },
+  
+  "deployment_type": "cluster",
+  "environment": "production",
+  "debug": false
+}

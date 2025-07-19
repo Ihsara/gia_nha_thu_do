@@ -17,7 +17,7 @@ from loguru import logger
 
 from .deployment import DeploymentManager, DeploymentType, create_deployment_manager
 from .orchestrator import EnhancedScraperOrchestrator, load_config_and_create_orchestrators
-from .cluster import ClusterCoordinator, create_cluster_coordinator, NodeHealth, NodeStatus
+from .cluster import ClusterCoordinator, create_cluster_coordinator, HealthStatus, NodeStatus
 from .status_cli import status as status_commands
 
 
@@ -138,7 +138,7 @@ def run_cluster_mode(deployment_manager: DeploymentManager, city: Optional[str] 
             return
         
         # Register node with cluster
-        node_health = NodeHealth(
+        node_health = HealthStatus(
             node_id=config.node_id,
             status=NodeStatus.HEALTHY,
             last_heartbeat=time.time(),
@@ -189,7 +189,7 @@ def run_cluster_worker_loop(coordinator: ClusterCoordinator,
                 memory_usage = psutil.virtual_memory().used / 1024 / 1024  # MB
                 cpu_usage = psutil.cpu_percent(interval=1)
                 
-                health = NodeHealth(
+                health = HealthStatus(
                     node_id=coordinator.node_id,
                     status=NodeStatus.HEALTHY,
                     last_heartbeat=datetime.now(),
@@ -347,6 +347,14 @@ def system_status(ctx):
 
 # Add status reporting commands as a subgroup
 cli.add_command(status_commands, name='reports')
+
+# Add alert management commands as a subgroup
+from .alert_cli import alerts as alert_commands
+cli.add_command(alert_commands, name='alerts')
+
+# Add scheduler management commands as a subgroup
+from .scheduler_cli import scheduler as scheduler_commands
+cli.add_command(scheduler_commands, name='scheduler')
 
 
 @cli.command()

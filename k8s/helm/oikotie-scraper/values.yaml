@@ -1,0 +1,204 @@
+# Default values for oikotie-scraper
+# This is a YAML-formatted file.
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Image configuration
+image:
+  registry: docker.io
+  repository: oikotie-scraper
+  tag: "latest"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# Deployment configuration
+deployment:
+  replicaCount: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  # Pod configuration
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext:
+    fsGroup: 1000
+    runAsNonRoot: true
+    runAsUser: 1000
+  
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 1000
+
+# Application configuration
+app:
+  environment: production
+  deploymentType: cluster
+  logLevel: INFO
+  maxWorkers: 3
+  headlessBrowser: true
+  healthCheckEnabled: true
+  gracefulShutdownTimeout: 30
+  
+  # Database configuration
+  database:
+    path: "/shared/real_estate.duckdb"
+    
+  # Scraping configuration
+  scraping:
+    stalenessThresholdHours: 24
+    retryLimit: 3
+    batchSize: 50
+    
+  # Cities to scrape
+  cities:
+    - name: "Helsinki"
+      enabled: true
+      url: "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100"
+      maxDetailWorkers: 3
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+# Health checks
+healthCheck:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /health/live
+      port: 8080
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Resource configuration
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "200m"
+  limits:
+    memory: "1Gi"
+    cpu: "500m"
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Persistent storage
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteMany
+  size: 10Gi
+  annotations: {}
+
+# Redis configuration (for cluster coordination)
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+  replica:
+    replicaCount: 1
+
+# External Redis (if not using bundled Redis)
+externalRedis:
+  host: ""
+  port: 6379
+  password: ""
+
+# ConfigMap and Secrets
+config:
+  # Additional configuration files
+  files: {}
+
+secrets:
+  # External secrets
+  external: {}
+
+# Node selection
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# RBAC
+rbac:
+  create: true
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+    labels: {}
+    annotations: {}
+
+# Ingress
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+
+# Environment variables
+env:
+  # Additional environment variables
+  extra: []
+
+# Volume mounts
+volumeMounts:
+  extra: []
+
+# Volumes
+volumes:
+  extra: []

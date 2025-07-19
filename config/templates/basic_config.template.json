@@ -1,0 +1,66 @@
+{
+  "_comment": "Basic configuration template for daily scraper automation",
+  "_documentation": {
+    "description": "This template provides a minimal configuration for running the daily scraper automation system",
+    "usage": "Copy this file to config/scraper_config.json and modify as needed",
+    "required_fields": ["tasks", "database"],
+    "optional_fields": ["monitoring", "scheduling", "cluster", "alerting"]
+  },
+  
+  "tasks": [
+    {
+      "_comment": "Scraping task configuration for each city",
+      "city": "Helsinki",
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "enabled": true,
+      "max_detail_workers": 5,
+      "staleness_hours": 24,
+      "listing_limit": null,
+      "retry_count": 3,
+      "retry_backoff_factor": 2.0
+    }
+  ],
+  
+  "database": {
+    "_comment": "Database configuration - uses DuckDB as primary storage",
+    "path": "data/real_estate.duckdb",
+    "connection_timeout": 30,
+    "max_connections": 10,
+    "backup_enabled": true,
+    "backup_interval_hours": 24
+  },
+  
+  "monitoring": {
+    "_comment": "Monitoring and logging configuration",
+    "metrics_enabled": true,
+    "prometheus_port": 8000,
+    "health_check_port": 8001,
+    "log_level": "INFO",
+    "log_file_retention": 30,
+    "alert_channels": []
+  },
+  
+  "scheduling": {
+    "_comment": "Scheduling configuration for automated execution",
+    "enabled": true,
+    "cron_expression": "0 6 * * *",
+    "timezone": "Europe/Helsinki",
+    "max_execution_time": 7200,
+    "concurrent_tasks": 1
+  },
+  
+  "cluster": {
+    "_comment": "Cluster coordination (disabled by default)",
+    "enabled": false,
+    "redis_host": "localhost",
+    "redis_port": 6379,
+    "redis_db": 0,
+    "node_id": null,
+    "heartbeat_interval": 30,
+    "work_lock_ttl": 300
+  },
+  
+  "deployment_type": "standalone",
+  "environment": "production",
+  "debug": false
+}
