@@ -37,6 +37,18 @@ from .config import (
 #     migrate_existing_orchestrator_to_governance
 # )
 
+from .security import (
+    SecurityConfig,
+    SecurityManager,
+    CredentialManager,
+    AuditLogger,
+    RateLimiter,
+    AuditEventType,
+    ThreatLevel,
+    SecurityLevel,
+    create_security_manager
+)
+
 __all__ = [
     'ConfigurationManager',
     'ScraperConfig',
@@ -59,7 +71,16 @@ __all__ = [
     'GovernanceIntegratedOrchestrator',
     'GovernanceIntegrationConfig',
     'create_governance_integrated_orchestrator',
-    'migrate_existing_orchestrator_to_governance'
+    'migrate_existing_orchestrator_to_governance',
+    'SecurityConfig',
+    'SecurityManager',
+    'CredentialManager',
+    'AuditLogger',
+    'RateLimiter',
+    'AuditEventType',
+    'ThreatLevel',
+    'SecurityLevel',
+    'create_security_manager'
 ]
 
 __version__ = "1.0.0"

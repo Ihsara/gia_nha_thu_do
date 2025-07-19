@@ -7,7 +7,6 @@ data quality tracking, and structured logging capabilities for operational visib
 
 import json
 import time
-import psutil
 import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Callable
@@ -17,6 +16,69 @@ from collections import defaultdict, deque
 from loguru import logger
 import socket
 import os
+
+# Import psutil with fallback handling
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    logger.warning("psutil not available - system monitoring will be limited")
+    PSUTIL_AVAILABLE = False
+    
+    # Mock psutil for when it's not available
+    class MockPsutil:
+        @staticmethod
+        def cpu_percent(interval=None):
+            return 0.0
+        
+        @staticmethod
+        def virtual_memory():
+            class MockMemory:
+                percent = 0.0
+                total = 1024 * 1024 * 1024  # 1GB
+                available = 1024 * 1024 * 1024
+                used = 0
+            return MockMemory()
+        
+        @staticmethod
+        def disk_usage(path):
+            class MockDisk:
+                total = 100 * 1024 * 1024 * 1024  # 100GB
+                used = 10 * 1024 * 1024 * 1024   # 10GB
+                free = 90 * 1024 * 1024 * 1024   # 90GB
+            return MockDisk()
+        
+        @staticmethod
+        def net_io_counters():
+            class MockNetwork:
+                bytes_sent = 0
+                bytes_recv = 0
+            return MockNetwork()
+        
+        @staticmethod
+        def net_connections():
+            return []
+        
+        @staticmethod
+        def cpu_count():
+            return 4
+        
+        class Process:
+            def __init__(self):
+                pass
+            
+            def memory_info(self):
+                class MockMemoryInfo:
+                    rss = 100 * 1024 * 1024  # 100MB
+                    vms = 200 * 1024 * 1024  # 200MB
+                return MockMemoryInfo()
+            
+            def memory_percent(self):
+                return 5.0
+        
+        AccessDenied = Exception
+    
+    psutil = MockPsutil()
 
 try:
     from prometheus_client import (

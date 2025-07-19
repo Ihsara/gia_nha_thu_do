@@ -9,7 +9,6 @@ comprehensive error handling, and OSM building footprint validation integration.
 import json
 import time
 import uuid
-import psutil
 import asyncio
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple, Any
@@ -27,6 +26,27 @@ from .metrics import MetricsCollector
 from .monitoring import ComprehensiveMonitor
 from .logging_config import create_monitoring_context, log_execution_start, log_performance_metric
 from .data_governance import DataGovernanceManager, DataSource
+
+# Import psutil with fallback handling
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    logger.warning("psutil not available - memory monitoring will be limited")
+    PSUTIL_AVAILABLE = False
+    
+    # Mock psutil for when it's not available
+    class MockPsutil:
+        class Process:
+            def __init__(self):
+                pass
+            
+            def memory_info(self):
+                class MockMemoryInfo:
+                    rss = 100 * 1024 * 1024  # 100MB
+                return MockMemoryInfo()
+    
+    psutil = MockPsutil()
 
 
 class ExecutionStatus(Enum):

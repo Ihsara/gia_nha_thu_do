@@ -1,0 +1,104 @@
+{
+  "security": {
+    "encryption": {
+      "enabled": true,
+      "key_rotation_days": 90,
+      "algorithm": "fernet"
+    },
+    "audit_logging": {
+      "enabled": true,
+      "log_path": "logs/audit.log",
+      "retention_days": 365,
+      "log_level": "INFO",
+      "structured_format": true
+    },
+    "rate_limiting": {
+      "enabled": true,
+      "max_requests_per_minute": 60,
+      "max_requests_per_hour": 1000,
+      "block_duration_minutes": 30,
+      "whitelist_ips": []
+    },
+    "vulnerability_scanning": {
+      "enabled": true,
+      "scan_interval_hours": 24,
+      "auto_scan_on_startup": false,
+      "scan_components": [
+        "file_permissions",
+        "configuration_security",
+        "dependency_vulnerabilities",
+        "network_security",
+        "database_security"
+      ]
+    },
+    "backup": {
+      "enabled": true,
+      "interval_hours": 6,
+      "retention_days": 30,
+      "encryption_enabled": true,
+      "backup_path": "backups",
+      "components": [
+        "database",
+        "configuration",
+        "logs",
+        "security_data"
+      ],
+      "exclude_patterns": [
+        "*.tmp",
+        "*.log.gz",
+        "__pycache__/*"
+      ]
+    },
+    "access_control": {
+      "require_authentication": false,
+      "session_timeout_minutes": 60,
+      "max_failed_attempts": 5,
+      "lockout_duration_minutes": 30,
+      "password_policy": {
+        "min_length": 12,
+        "require_uppercase": true,
+        "require_lowercase": true,
+        "require_numbers": true,
+        "require_special_chars": true
+      }
+    },
+    "monitoring": {
+      "security_events_enabled": true,
+      "alert_on_critical_events": true,
+      "metrics_collection": true,
+      "health_checks": true
+    }
+  },
+  "deployment": {
+    "security_hardening": {
+      "file_permissions": {
+        "config_files": "600",
+        "log_files": "640",
+        "database_files": "600",
+        "security_files": "600"
+      },
+      "network_security": {
+        "bind_localhost_only": true,
+        "disable_unnecessary_ports": true,
+        "use_tls": false
+      },
+      "process_security": {
+        "run_as_non_root": true,
+        "limit_resources": true,
+        "enable_sandboxing": false
+      }
+    }
+  },
+  "compliance": {
+    "data_protection": {
+      "encrypt_sensitive_data": true,
+      "data_retention_policy": true,
+      "audit_data_access": true
+    },
+    "security_standards": {
+      "follow_owasp_guidelines": true,
+      "regular_security_reviews": true,
+      "incident_response_plan": true
+    }
+  }
+}

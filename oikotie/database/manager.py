@@ -717,18 +717,35 @@ class EnhancedDatabaseManager:
             logger.error(f"Failed to get execution errors: {e}")
             return []
     
-    def get_execution_history(self, city: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+    def get_execution_history(self, city: str, start_date: datetime = None, end_date: datetime = None, limit: int = 50) -> List[Dict[str, Any]]:
         """Get execution history for a city within a date range."""
         try:
             with duckdb.connect(str(self.db_path), read_only=True) as con:
-                result = con.execute("""
+                # Build query based on provided parameters
+                query = """
                     SELECT execution_id, started_at, completed_at, status,
                            listings_processed, listings_new, listings_failed,
                            execution_time_seconds, memory_usage_mb
                     FROM scraping_executions
-                    WHERE city = ? AND started_at >= ? AND started_at <= ?
-                    ORDER BY started_at DESC
-                """, [city, start_date, end_date]).fetchall()
+                    WHERE city = ?
+                """
+                params = [city]
+                
+                if start_date:
+                    query += " AND started_at >= ?"
+                    params.append(start_date)
+                
+                if end_date:
+                    query += " AND started_at <= ?"
+                    params.append(end_date)
+                
+                query += " ORDER BY started_at DESC"
+                
+                if limit:
+                    query += " LIMIT ?"
+                    params.append(limit)
+                
+                result = con.execute(query, params).fetchall()
                 
                 executions = []
                 for row in result:

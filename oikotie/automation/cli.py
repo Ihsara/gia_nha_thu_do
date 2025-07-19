@@ -19,6 +19,7 @@ from .deployment import DeploymentManager, DeploymentType, create_deployment_man
 from .orchestrator import EnhancedScraperOrchestrator, load_config_and_create_orchestrators
 from .cluster import ClusterCoordinator, create_cluster_coordinator, HealthStatus, NodeStatus
 from .status_cli import status as status_commands
+from .security_cli import security_cli
 
 
 @click.group()
@@ -347,6 +348,9 @@ def system_status(ctx):
 
 # Add status reporting commands as a subgroup
 cli.add_command(status_commands, name='reports')
+
+# Add security management commands as a subgroup
+cli.add_command(security_cli, name='security')
 
 # Add alert management commands as a subgroup
 from .alert_cli import alerts as alert_commands

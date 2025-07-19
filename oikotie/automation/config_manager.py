@@ -315,6 +315,51 @@ class ConfigurationManager:
         
         return config
     
+    def load_config_from_dict(self, config_dict: Dict[str, Any]) -> ScraperConfiguration:
+        """
+        Load configuration from a dictionary (for testing and programmatic use).
+        
+        Args:
+            config_dict: Configuration dictionary
+            
+        Returns:
+            Loaded and validated configuration
+        """
+        logger.info("Loading configuration from dictionary")
+        
+        # Start with default configuration
+        config = ScraperConfiguration()
+        config.deployment_type = self.deployment_type
+        config.loaded_from.append(ConfigSource.DEFAULT.value)
+        
+        # Merge with provided dictionary
+        if config_dict:
+            config = self._merge_configurations(config, config_dict)
+            config.loaded_from.append("dictionary")
+            logger.info("Applied dictionary configuration")
+        
+        # Apply environment-specific overrides if specified
+        if hasattr(config, 'environment') and config.environment:
+            env_overrides = self._get_environment_overrides(config.environment)
+            if env_overrides:
+                config = self._merge_configurations(config, env_overrides)
+                config.loaded_from.append(f"environment_override:{config.environment}")
+                logger.info(f"Applied {config.environment} environment overrides")
+        
+        # Set metadata
+        config.last_updated = time.time()
+        
+        # Validate configuration
+        self.validation_errors = self._validate_configuration(config)
+        if self.validation_errors:
+            # For testing, we'll be more lenient with validation
+            logger.warning(f"Configuration validation warnings: {self.validation_errors}")
+        
+        self.config = config
+        logger.info(f"Configuration loaded successfully from sources: {config.loaded_from}")
+        
+        return config
+    
     def _detect_deployment_type(self) -> DeploymentType:
         """
         Detect the deployment environment type.
@@ -620,7 +665,13 @@ class ConfigurationManager:
             ScraperConfiguration object
         """
         # Create nested configuration objects
-        database_config = DatabaseConfig(**config_dict.get('database', {}))
+        database_dict = config_dict.get('database', {})
+        
+        # Handle path vs duckdb_path mapping for backward compatibility
+        if 'duckdb_path' in database_dict and 'path' not in database_dict:
+            database_dict['path'] = database_dict.pop('duckdb_path')
+        
+        database_config = DatabaseConfig(**database_dict)
         scraping_config = ScrapingConfig(**config_dict.get('scraping', {}))
         cluster_config = ClusterConfig(**config_dict.get('cluster', {}))
         monitoring_config = MonitoringConfig(**config_dict.get('monitoring', {}))
