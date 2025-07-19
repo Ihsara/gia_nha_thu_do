@@ -7,13 +7,16 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies with security updates
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     unzip \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Install Chrome and ChromeDriver for Selenium
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \

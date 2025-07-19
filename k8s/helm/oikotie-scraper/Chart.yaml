@@ -1,0 +1,24 @@
+apiVersion: v2
+name: oikotie-scraper
+description: A Helm chart for Oikotie Daily Scraper Automation System
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - scraper
+  - automation
+  - real-estate
+  - data-collection
+home: https://github.com/your-org/oikotie-scraper
+sources:
+  - https://github.com/your-org/oikotie-scraper
+maintainers:
+  - name: Oikotie Team
+    email: team@example.com
+dependencies:
+  - name: redis
+    version: "17.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+annotations:
+  category: DataCollection

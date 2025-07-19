@@ -19,6 +19,24 @@ from .config import (
     create_cli_parser
 )
 
+# Data governance imports temporarily disabled for testing
+# from .data_governance import (
+#     DataGovernanceManager,
+#     DataSource,
+#     DataQualityLevel,
+#     DataQualityScore,
+#     RetentionPolicy,
+#     ComplianceReport,
+#     create_data_governance_config
+# )
+
+# from .governance_integration import (
+#     GovernanceIntegratedOrchestrator,
+#     GovernanceIntegrationConfig,
+#     create_governance_integrated_orchestrator,
+#     migrate_existing_orchestrator_to_governance
+# )
+
 __all__ = [
     'ConfigurationManager',
     'ScraperConfig',
@@ -30,7 +48,18 @@ __all__ = [
     'DeploymentType',
     'ConfigSource',
     'ConfigValidationError',
-    'create_cli_parser'
+    'create_cli_parser',
+    'DataGovernanceManager',
+    'DataSource',
+    'DataQualityLevel',
+    'DataQualityScore',
+    'RetentionPolicy',
+    'ComplianceReport',
+    'create_data_governance_config',
+    'GovernanceIntegratedOrchestrator',
+    'GovernanceIntegrationConfig',
+    'create_governance_integrated_orchestrator',
+    'migrate_existing_orchestrator_to_governance'
 ]
 
 __version__ = "1.0.0"
