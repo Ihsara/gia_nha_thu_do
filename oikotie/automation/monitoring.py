@@ -49,6 +49,30 @@ except ImportError:
             return MockDisk()
         
         @staticmethod
+        def Process():
+            class MockProcess:
+                def memory_info(self):
+                    class MockMemInfo:
+                        rss = 100 * 1024 * 1024  # 100MB
+                        vms = 200 * 1024 * 1024  # 200MB
+                    return MockMemInfo()
+                
+                def memory_percent(self):
+                    return 5.0
+                
+                def cpu_percent(self):
+                    return 10.0
+            return MockProcess()
+        
+        @staticmethod
+        def getloadavg():
+            return (0.5, 0.6, 0.7)
+        
+        @staticmethod
+        def cpu_count():
+            return 4
+        
+        @staticmethod
         def net_io_counters():
             class MockNetwork:
                 bytes_sent = 0
@@ -59,23 +83,7 @@ except ImportError:
         def net_connections():
             return []
         
-        @staticmethod
-        def cpu_count():
-            return 4
-        
-        class Process:
-            def __init__(self):
-                pass
-            
-            def memory_info(self):
-                class MockMemoryInfo:
-                    rss = 100 * 1024 * 1024  # 100MB
-                    vms = 200 * 1024 * 1024  # 200MB
-                return MockMemoryInfo()
-            
-            def memory_percent(self):
-                return 5.0
-        
+        # Mock exception class
         AccessDenied = Exception
     
     psutil = MockPsutil()

@@ -717,7 +717,7 @@ class EnhancedDatabaseManager:
             logger.error(f"Failed to get execution errors: {e}")
             return []
     
-    def get_execution_history(self, city: str, start_date: datetime = None, end_date: datetime = None, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_execution_history_by_date_range(self, city: str, start_date: datetime = None, end_date: datetime = None, limit: int = 50) -> List[Dict[str, Any]]:
         """Get execution history for a city within a date range."""
         try:
             with duckdb.connect(str(self.db_path), read_only=True) as con:

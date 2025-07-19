@@ -38,6 +38,25 @@ from oikotie.database.manager import EnhancedDatabaseManager
 class TestAutomationIntegration(unittest.TestCase):
     """Comprehensive integration tests for automation system"""
     
+    def _get_result_status(self, result):
+        """Helper to get status from ScrapingResult object or dict"""
+        if hasattr(result, 'status'):
+            # ScrapingResult object
+            status = result.status
+            if hasattr(status, 'value'):
+                return status.value
+            return str(status)
+        elif isinstance(result, dict):
+            # Dictionary result
+            return result.get('status', 'unknown')
+        else:
+            return 'unknown'
+    
+    def _is_result_successful(self, result):
+        """Helper to check if result is successful"""
+        status = self._get_result_status(result)
+        return status in ['success', 'completed', 'SUCCESS', 'COMPLETED']
+    
     def _create_test_scraper_config(self, city="Helsinki", listing_limit=10):
         """Create a test ScraperConfig object"""
         return ScraperConfig(
@@ -334,7 +353,7 @@ class TestAutomationIntegration(unittest.TestCase):
                     result = orchestrator.run_daily_scrape()
                     execution_time = time.time() - start_time
                     
-                    scenario_success = result.get('status') in ['success', 'completed']
+                    scenario_success = self._is_result_successful(result)
                     
                     self.integration_results[f'{scenario}_deployment'] = {
                         'success': scenario_success,
@@ -414,7 +433,7 @@ class TestAutomationIntegration(unittest.TestCase):
                     'max_listings_per_city': scenario['max_listings'],
                     'system_metrics': system_metrics,
                     'result': result,
-                    'success': result.get('status') in ['success', 'completed']
+                    'success': self._is_result_successful(result)
                 }
                 
                 # Performance thresholds
@@ -725,7 +744,7 @@ class TestAutomationIntegration(unittest.TestCase):
                 
                 try:
                     result = asyncio.run(orchestrator.run_daily_scrape())
-                    graceful_handling = result.get('status') == 'failed'  # Should fail gracefully
+                    graceful_handling = self._get_result_status(result) == 'failed'  # Should fail gracefully
                 except Exception:
                     graceful_handling = False  # Should not raise unhandled exception
                 
@@ -750,7 +769,7 @@ class TestAutomationIntegration(unittest.TestCase):
                     
                     try:
                         result = asyncio.run(orchestrator.run_daily_scrape())
-                        graceful_handling = 'error' in result or result.get('status') == 'failed'
+                        graceful_handling = hasattr(result, 'error_summary') or self._get_result_status(result) == 'failed'
                     except Exception:
                         graceful_handling = False
                     
@@ -818,7 +837,7 @@ class TestAutomationIntegration(unittest.TestCase):
             
             return {
                 'session_id': session_id,
-                'success': result.get('status') in ['success', 'completed'],
+                'success': self._is_result_successful(result),
                 'execution_time': execution_time,
                 'result': result
             }

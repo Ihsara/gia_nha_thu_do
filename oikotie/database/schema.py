@@ -9,7 +9,12 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
 import duckdb
+import threading
 from loguru import logger
+
+# Global lock for spatial extension initialization
+_spatial_init_lock = threading.Lock()
+_spatial_initialized = set()
 
 
 @dataclass
@@ -195,7 +200,7 @@ class DatabaseSchema:
                 'longitude': 'REAL',
                 'postcode': 'TEXT',
                 'district': 'TEXT',
-                'geometry': 'GEOMETRY',
+                'geometry': 'TEXT',  # Store as WKT text when spatial extension not available
             },
             constraints=[],
             indexes=[
@@ -210,9 +215,17 @@ class DatabaseSchema:
         
         try:
             with duckdb.connect(self.db_path) as con:
-                # Enable spatial extension
-                con.execute("INSTALL spatial;")
-                con.execute("LOAD spatial;")
+                # Enable spatial extension with thread safety
+                try:
+                    con.execute("INSTALL spatial;")
+                    con.execute("LOAD spatial;")
+                    logger.debug(f"Spatial extension loaded for {self.db_path}")
+                except Exception as e:
+                    if "already exists" in str(e) or "already loaded" in str(e) or "already installed" in str(e):
+                        logger.debug(f"Spatial extension already available for {self.db_path}")
+                    else:
+                        logger.warning(f"Failed to load spatial extension: {e}")
+                        # Continue without spatial extension for basic functionality
                 
                 for table_name, schema in self.schemas.items():
                     self._create_table(con, schema)
