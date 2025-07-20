@@ -16,7 +16,7 @@ from enum import Enum
 import redis
 from loguru import logger
 import threading
-import psutil
+from .psutil_compat import psutil
 import socket
 
 

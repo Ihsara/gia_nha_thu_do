@@ -123,6 +123,10 @@ class EnhancedDatabaseManager:
             logger.critical(f"Failed to initialize database: {e}")
             raise
     
+    def get_connection(self):
+        """Get a database connection for direct queries."""
+        return duckdb.connect(str(self.db_path))
+    
     def get_stale_listings(self, staleness_threshold: timedelta = timedelta(hours=24)) -> List[ListingRecord]:
         """Get listings that need re-scraping based on staleness threshold."""
         cutoff_time = datetime.now() - staleness_threshold

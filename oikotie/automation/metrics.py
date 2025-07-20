@@ -8,7 +8,7 @@ to track historical trends and provide actionable insights.
 
 import json
 import time
-import psutil
+from .psutil_compat import psutil
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, asdict, field

@@ -20,7 +20,7 @@ import asyncio
 from loguru import logger
 
 try:
-    import psutil
+    from .psutil_compat import psutil
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False

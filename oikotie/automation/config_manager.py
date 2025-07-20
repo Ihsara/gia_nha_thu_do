@@ -668,15 +668,51 @@ class ConfigurationManager:
         database_dict = config_dict.get('database', {})
         
         # Handle path vs duckdb_path mapping for backward compatibility
-        if 'duckdb_path' in database_dict and 'path' not in database_dict:
-            database_dict['path'] = database_dict.pop('duckdb_path')
+        if 'path' in database_dict:
+            if 'duckdb_path' not in database_dict:
+                database_dict['duckdb_path'] = database_dict.pop('path')
+            else:
+                # If both exist, prefer the override 'path' value and remove the conflicting parameter
+                database_dict['duckdb_path'] = database_dict.pop('path')
         
         database_config = DatabaseConfig(**database_dict)
         scraping_config = ScrapingConfig(**config_dict.get('scraping', {}))
         cluster_config = ClusterConfig(**config_dict.get('cluster', {}))
-        monitoring_config = MonitoringConfig(**config_dict.get('monitoring', {}))
+        
+        # Handle monitoring config parameter mapping
+        monitoring_dict = config_dict.get('monitoring', {}).copy()
+        
+        # Map metrics_port to prometheus_port
+        if 'metrics_port' in monitoring_dict:
+            if 'prometheus_port' not in monitoring_dict:
+                monitoring_dict['prometheus_port'] = monitoring_dict.pop('metrics_port')
+            else:
+                # If both exist, prefer the override 'metrics_port' value
+                monitoring_dict['prometheus_port'] = monitoring_dict.pop('metrics_port')
+        
+        # Filter out parameters that don't belong to MonitoringConfig
+        # (system_monitor_interval is used by other components)
+        monitoring_config_params = {
+            'enabled', 'prometheus_port', 'metrics_path', 'collect_system_metrics',
+            'health_check_port', 'health_check_path', 'log_level', 'log_format',
+            'log_file', 'max_log_size', 'log_retention_days'
+        }
+        filtered_monitoring_dict = {k: v for k, v in monitoring_dict.items() 
+                                  if k in monitoring_config_params}
+        
+        monitoring_config = MonitoringConfig(**filtered_monitoring_dict)
         scheduling_config = SchedulingConfig(**config_dict.get('scheduling', {}))
-        alerting_config = AlertingConfig(**config_dict.get('alerting', {}))
+        
+        # Handle alerting config parameter filtering
+        alerting_dict = config_dict.get('alerting', {}).copy()
+        alerting_config_params = {
+            'enabled', 'config_file', 'max_alerts_per_hour', 'enable_deduplication',
+            'dedup_window_minutes', 'enable_escalation', 'escalation_delay_minutes'
+        }
+        filtered_alerting_dict = {k: v for k, v in alerting_dict.items() 
+                                if k in alerting_config_params}
+        
+        alerting_config = AlertingConfig(**filtered_alerting_dict)
         
         # Handle deployment type
         deployment_type = config_dict.get('deployment_type', DeploymentType.STANDALONE)

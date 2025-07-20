@@ -173,7 +173,7 @@ def run_cluster_worker_loop(coordinator: ClusterCoordinator,
                            deployment_manager: DeploymentManager,
                            city_filter: Optional[str] = None):
     """Run the main cluster worker loop."""
-    import psutil
+    from .psutil_compat import psutil
     from datetime import datetime
     
     start_time = datetime.now()

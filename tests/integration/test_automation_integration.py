@@ -734,6 +734,7 @@ class TestAutomationIntegration(unittest.TestCase):
                 # Test with broken database connection
                 broken_db_manager = Mock()
                 broken_db_manager.get_connection.side_effect = Exception("Database connection failed")
+                broken_db_manager.db_path = "data/real_estate.duckdb"  # Provide a real path for the mock
                 
                 scraper_config = self._create_test_scraper_config()
                 

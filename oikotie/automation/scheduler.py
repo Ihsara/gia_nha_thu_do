@@ -17,7 +17,7 @@ from enum import Enum
 from pathlib import Path
 from threading import Thread, Event, Lock
 from typing import Any, Callable, Dict, List, Optional, Set, Union
-import psutil
+from .psutil_compat import psutil
 from croniter import croniter
 from loguru import logger
 

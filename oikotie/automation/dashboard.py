@@ -305,7 +305,7 @@ class DashboardDataCollector:
     def _get_system_performance_metrics(self) -> Dict[str, Any]:
         """Get current system performance metrics."""
         try:
-            import psutil
+            from .psutil_compat import psutil
             
             # Get current system metrics
             cpu_percent = psutil.cpu_percent(interval=1)
