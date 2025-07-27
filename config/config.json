@@ -4,14 +4,47 @@
       "city": "Helsinki",
       "enabled": true,
       "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
-      "max_detail_workers": 5
+      "max_detail_workers": 5,
+      "rate_limit_seconds": 1.0,
+      "coordinate_bounds": [24.5, 60.0, 25.5, 60.5],
+      "geospatial_sources": [
+        "helsinki_open_data",
+        "osm_buildings",
+        "national_geodata"
+      ],
+      "data_governance": {
+        "max_requests_per_second": 1,
+        "bulk_download_preference": true,
+        "cache_duration_hours": 24
+      }
     },
     {
       "city": "Espoo",
-      "enabled": false,
+      "enabled": true,
       "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B49,6,%22Espoo%22%5D%5D&cardType=100",
-      "listing_limit": 10,
-      "max_detail_workers": 5
+      "max_detail_workers": 5,
+      "rate_limit_seconds": 1.0,
+      "coordinate_bounds": [24.4, 60.1, 24.9, 60.4],
+      "geospatial_sources": [
+        "espoo_open_data",
+        "osm_buildings",
+        "national_geodata"
+      ],
+      "data_governance": {
+        "max_requests_per_second": 1,
+        "bulk_download_preference": true,
+        "cache_duration_hours": 24
+      }
     }
-  ]
+  ],
+  "global_settings": {
+    "database_path": "data/real_estate.duckdb",
+    "output_directory": "output",
+    "log_level": "INFO",
+    "cluster_coordination": {
+      "redis_url": "redis://localhost:6379",
+      "heartbeat_interval": 30,
+      "work_distribution_strategy": "round_robin"
+    }
+  }
 }

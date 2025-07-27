@@ -1,0 +1,173 @@
+# Prometheus alert rules for multi-city scraper monitoring
+groups:
+- name: scraper.rules
+  rules:
+  # High-level system alerts
+  - alert: HighCPUUsage
+    expr: avg(rate(process_cpu_seconds_total{job="scraper-nodes"}[5m])) > 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage detected"
+      description: "CPU usage is above 80% for 5 minutes on {{ $labels.instance }}"
+
+  - alert: HighMemoryUsage
+    expr: (process_resident_memory_bytes{job="scraper-nodes"} / 1024 / 1024 / 1024) > 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage detected"
+      description: "Memory usage is above 800MB for 5 minutes on {{ $labels.instance }}"
+
+  - alert: ScraperNodeDown
+    expr: up{job="scraper-nodes"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Scraper node is down"
+      description: "Scraper node {{ $labels.instance }} has been down for more than 1 minute"
+
+- name: city-specific.rules
+  rules:
+  # City-specific scraping alerts
+  - alert: CityScrapingFailure
+    expr: increase(scraper_city_scraping_failures_total{job="city-metrics"}[10m]) > 5
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Scraping failures for {{ $labels.city }}"
+      description: "{{ $labels.city }} has experienced {{ $value }} scraping failures in the last 10 minutes"
+
+  - alert: CityScrapingStalled
+    expr: time() - scraper_city_last_successful_scrape_timestamp{job="city-metrics"} > 3600
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Scraping stalled for {{ $labels.city }}"
+      description: "{{ $labels.city }} hasn't had a successful scrape in over 1 hour"
+
+  - alert: LowListingCount
+    expr: scraper_city_listings_scraped_total{job="city-metrics"} < 10
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low listing count for {{ $labels.city }}"
+      description: "{{ $labels.city }} has only {{ $value }} listings scraped in the last scraping cycle"
+
+- name: geospatial.rules
+  rules:
+  # Geospatial data quality alerts
+  - alert: LowGeospatialMatchRate
+    expr: scraper_city_geospatial_match_rate{job="city-metrics"} < 0.95
+    for: 30m
+    labels:
+      severity: warning
+      threshold: "95%"
+    annotations:
+      summary: "Low geospatial match rate for {{ $labels.city }}"
+      description: "{{ $labels.city }} has a geospatial match rate of {{ $value | humanizePercentage }} (below 95%) for 30 minutes"
+
+  - alert: GeospatialAPIFailure
+    expr: increase(scraper_geospatial_api_failures_total{job="city-metrics"}[15m]) > 10
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Geospatial API failures for {{ $labels.city }}"
+      description: "{{ $labels.city }} has experienced {{ $value }} geospatial API failures in the last 15 minutes"
+
+  - alert: CoordinateValidationFailures
+    expr: increase(scraper_coordinate_validation_failures_total{job="city-metrics"}[30m]) > 20
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High coordinate validation failures for {{ $labels.city }}"
+      description: "{{ $labels.city }} has {{ $value }} coordinate validation failures in the last 30 minutes"
+
+- name: database.rules
+  rules:
+  # Database health alerts
+  - alert: DatabaseConnectionFailure
+    expr: scraper_database_connection_failures_total > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Database connection failures detected"
+      description: "Database connection failures detected on {{ $labels.instance }}: {{ $value }} failures"
+
+  - alert: DatabaseHighLatency
+    expr: histogram_quantile(0.95, rate(scraper_database_query_duration_seconds_bucket[5m])) > 5
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High database query latency"
+      description: "95th percentile database query latency is {{ $value }}s (above 5s) on {{ $labels.instance }}"
+
+  - alert: DatabaseDiskSpaceLow
+    expr: scraper_database_disk_usage_percent > 85
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Database disk space running low"
+      description: "Database disk usage is {{ $value }}% (above 85%) on {{ $labels.instance }}"
+
+- name: backup.rules
+  rules:
+  # Backup and disaster recovery alerts
+  - alert: BackupFailure
+    expr: scraper_backup_last_success_timestamp < (time() - 86400)
+    for: 1h
+    labels:
+      severity: critical
+    annotations:
+      summary: "Backup failure detected"
+      description: "Last successful backup was more than 24 hours ago on {{ $labels.instance }}"
+
+  - alert: BackupSizeAnomaly
+    expr: abs(scraper_backup_size_bytes - scraper_backup_size_bytes offset 24h) / scraper_backup_size_bytes offset 24h > 0.5
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Backup size anomaly detected"
+      description: "Backup size has changed by more than 50% compared to 24 hours ago on {{ $labels.instance }}"
+
+- name: cluster.rules
+  rules:
+  # Cluster coordination alerts
+  - alert: RedisConnectionFailure
+    expr: up{job="redis"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis connection failure"
+      description: "Redis server is down, cluster coordination will be affected"
+
+  - alert: ClusterNodeCommunicationFailure
+    expr: scraper_cluster_node_communication_failures_total > 5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Cluster node communication issues"
+      description: "Node {{ $labels.instance }} has {{ $value }} communication failures with other cluster nodes"
+
+  - alert: WorkDistributionImbalance
+    expr: max(scraper_node_active_tasks) - min(scraper_node_active_tasks) > 10
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Work distribution imbalance detected"
+      description: "Work distribution is imbalanced across cluster nodes (difference: {{ $value }} tasks)"

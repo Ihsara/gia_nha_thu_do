@@ -769,6 +769,64 @@ class ComprehensiveMonitor:
         """Record the start of a scraping execution."""
         self.prometheus_exporter.record_execution_start(city)
     
+    def get_current_system_metrics(self) -> Dict[str, Any]:
+        """
+        Get current system metrics from all monitoring components.
+        
+        Returns:
+            Dictionary with current system metrics
+        """
+        try:
+            # Get system metrics from system monitor
+            current_system_metrics = self.system_monitor.get_current_metrics()
+            
+            # Get health check results
+            health_results = self.health_checker.run_health_checks()
+            
+            # Get resource usage from system monitor
+            resource_summary = self.system_monitor.get_metrics_summary(minutes_back=5)
+            
+            # Combine all metrics
+            combined_metrics = {
+                'timestamp': datetime.now().isoformat(),
+                'system_metrics': asdict(current_system_metrics) if current_system_metrics and hasattr(current_system_metrics, '__dataclass_fields__') else {},
+                'health_status': health_results,
+                'resource_summary': resource_summary,
+                'monitoring_status': {
+                    'system_monitor_active': self.system_monitor.is_monitoring,
+                    'metrics_server_active': self.monitoring_server.is_running,
+                    'prometheus_available': PROMETHEUS_AVAILABLE,
+                    'psutil_available': PSUTIL_AVAILABLE
+                }
+            }
+            
+            # Add application-specific metrics if available
+            if hasattr(self, 'metrics_collector') and self.metrics_collector:
+                try:
+                    app_metrics = self.metrics_collector.get_current_metrics()
+                    combined_metrics['application_metrics'] = app_metrics
+                except Exception as e:
+                    logger.warning(f"Failed to get application metrics: {e}")
+                    combined_metrics['application_metrics'] = {'error': str(e)}
+            
+            return combined_metrics
+            
+        except Exception as e:
+            logger.error(f"Failed to get current system metrics: {e}")
+            return {
+                'timestamp': datetime.now().isoformat(),
+                'error': str(e),
+                'system_metrics': {},
+                'health_status': {'overall_healthy': False, 'error': str(e)},
+                'resource_summary': {},
+                'monitoring_status': {
+                    'system_monitor_active': False,
+                    'metrics_server_active': False,
+                    'prometheus_available': PROMETHEUS_AVAILABLE,
+                    'psutil_available': PSUTIL_AVAILABLE
+                }
+            }
+
     def record_execution_complete(self, result: 'ScrapingResult') -> None:
         """Record completion of a scraping execution."""
         self.prometheus_exporter.record_execution_complete(result)
@@ -778,6 +836,17 @@ class ComprehensiveMonitor:
             self.prometheus_exporter.update_data_quality_metrics(
                 result.city, result.data_quality_metrics
             )
+    
+    def run_health_checks(self) -> Dict[str, Any]:
+        """Run comprehensive health checks and return results."""
+        return self.health_checker.run_health_checks()
+    
+
+        return None
+    
+    def get_metrics_summary(self) -> Dict[str, Any]:
+        """Get metrics summary."""
+        return self.system_monitor.get_metrics_summary()
     
     def get_monitoring_status(self) -> Dict[str, Any]:
         """Get comprehensive monitoring status."""

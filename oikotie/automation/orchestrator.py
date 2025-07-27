@@ -438,6 +438,70 @@ class EnhancedScraperOrchestrator:
             Current scraper configuration
         """
         return self.config
+    
+    def plan_execution(self, city: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Plan execution for a city and return execution plan details.
+        
+        Args:
+            city: City name to plan execution for (uses config city if None)
+            
+        Returns:
+            Dictionary with execution plan details
+        """
+        target_city = city or self.config.city
+        
+        try:
+            # Discover URLs that would be processed
+            discovered_urls = self._discover_listing_urls()
+            
+            # Apply smart deduplication if enabled
+            if self.config.enable_smart_deduplication:
+                dedup_summary = self.deduplication_manager.analyze_urls(discovered_urls)
+                urls_to_process = self.deduplication_manager.get_urls_to_process(discovered_urls)
+            else:
+                urls_to_process = discovered_urls
+                dedup_summary = None
+            
+            # Create processing plan
+            processing_batches = self.listing_manager.create_processing_plan(
+                urls_to_process, target_city, f"plan_{uuid.uuid4()}"
+            )
+            
+            # Calculate estimated execution time
+            estimated_time = len(urls_to_process) * 2.0  # Rough estimate: 2 seconds per URL
+            
+            return {
+                'city': target_city,
+                'total_urls': len(discovered_urls),
+                'urls_to_process': len(urls_to_process),
+                'urls_to_skip': len(discovered_urls) - len(urls_to_process),
+                'processing_batches': len(processing_batches),
+                'estimated_execution_time_seconds': estimated_time,
+                'deduplication_enabled': self.config.enable_smart_deduplication,
+                'deduplication_summary': dedup_summary,
+                'batch_details': [
+                    {
+                        'batch_id': batch.batch_id,
+                        'priority': batch.priority.name,
+                        'url_count': len(batch.urls),
+                        'estimated_time': len(batch.urls) * 2.0
+                    }
+                    for batch in processing_batches
+                ]
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to plan execution for {target_city}: {e}")
+            return {
+                'city': target_city,
+                'error': str(e),
+                'total_urls': 0,
+                'urls_to_process': 0,
+                'urls_to_skip': 0,
+                'processing_batches': 0,
+                'estimated_execution_time_seconds': 0
+            }
 
 
 def create_orchestrator_from_task_config(task_config: Dict[str, Any]) -> EnhancedScraperOrchestrator:

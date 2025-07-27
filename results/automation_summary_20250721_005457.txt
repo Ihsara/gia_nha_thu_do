@@ -1,0 +1,35 @@
+============================================================
+OIKOTIE DAILY AUTOMATION SUMMARY
+============================================================
+
+Execution Date: 2025-07-21 00:54:57
+Execution ID: daily_20250721_005457
+Status: COMPLETED
+Duration: 965.7s
+
+LISTING STATISTICS:
+--------------------
+Total listings before: 8,728
+Total listings after:  8,728
+Net change:           +0
+Reported new:         7,674
+Reported failed:      852
+
+CITY BREAKDOWN:
+---------------
+Helsinki    :  8,725 →  8,725 (+0)
+
+PERFORMANCE:
+------------
+Success rate:     90.0%
+Processing rate:  8.8 listings/sec
+Total processed:  8,526
+
+CITY RESULTS:
+-------------
+Helsinki    : 7674 new, 852 failed, 965.5s
+
+Files generated:
+- Complete results: results\automation_results_20250721_005457.json
+- Statistics: results\automation_stats_20250721_005457.json
+- Summary: results\automation_summary_20250721_005457.txt

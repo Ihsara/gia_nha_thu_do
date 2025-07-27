@@ -96,9 +96,19 @@ class SchedulingConfig:
     """Scheduling configuration"""
     enabled: bool = True
     cron_expression: str = "0 6 * * *"  # Daily at 6 AM
+    default_schedule: str = "0 6 * * *"  # Daily at 6 AM
     timezone: str = "Europe/Helsinki"
     max_execution_time: int = 7200  # 2 hours
+    max_concurrent_tasks: int = 1
     concurrent_tasks: int = 1
+    task_timeout: int = 3600  # 1 hour
+    retry_attempts: int = 3
+    retry_delay: int = 300  # 5 minutes
+    resource_limits: Dict[str, Any] = field(default_factory=lambda: {
+        'max_memory_mb': 2048,
+        'max_cpu_percent': 80,
+        'max_disk_usage_percent': 90
+    })
 
 
 @dataclass

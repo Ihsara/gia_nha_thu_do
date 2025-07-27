@@ -1,0 +1,97 @@
+{
+  "automation_run": {
+    "timestamp": "2025-07-21T00:54:57.089128",
+    "script_version": "1.0.0",
+    "execution_id": "daily_20250721_005457"
+  },
+  "pre_automation_state": {
+    "timestamp": "2025-07-21T00:54:57.089128",
+    "total_listings": 8728,
+    "city_breakdown": {
+      "Helsinki": 8725
+    },
+    "recent_listings_24h": 0,
+    "total_executions": 62,
+    "last_execution": {
+      "started_at": "2025-07-21 00:18:43.255102",
+      "city": "Helsinki",
+      "listings_new": 13,
+      "listings_failed": 1,
+      "status": "completed"
+    }
+  },
+  "automation_result": {
+    "execution_id": "daily_20250721_005457",
+    "started_at": "2025-07-21T00:54:57.595684",
+    "city_results": [
+      {
+        "city": "Helsinki",
+        "status": "completed",
+        "listings_new": 7674,
+        "listings_failed": 852,
+        "execution_time": 965.520454
+      }
+    ],
+    "total_new": 7674,
+    "total_failed": 852,
+    "total_execution_time": 965.720709,
+    "status": "completed",
+    "completed_at": "2025-07-21T01:11:03.316393"
+  },
+  "post_automation_state": {
+    "timestamp": "2025-07-21T01:11:03.362826",
+    "total_listings": 8728,
+    "city_breakdown": {
+      "Helsinki": 8725
+    },
+    "very_recent_listings_1h": 0
+  },
+  "statistics": {
+    "execution_summary": {
+      "execution_id": "daily_20250721_005457",
+      "status": "completed",
+      "started_at": "2025-07-21T00:54:57.595684",
+      "completed_at": "2025-07-21T01:11:03.316393",
+      "execution_time_seconds": 965.720709,
+      "execution_time_formatted": "965.7s"
+    },
+    "listing_changes": {
+      "total_difference": 0,
+      "reported_new": 7674,
+      "reported_failed": 852,
+      "city_differences": {
+        "Helsinki": 0
+      }
+    },
+    "database_state": {
+      "before": {
+        "total_listings": 8728,
+        "city_breakdown": {
+          "Helsinki": 8725
+        },
+        "recent_24h": 0
+      },
+      "after": {
+        "total_listings": 8728,
+        "city_breakdown": {
+          "Helsinki": 8725
+        },
+        "very_recent_1h": 0
+      }
+    },
+    "performance_metrics": {
+      "success_rate_percent": 90.01,
+      "total_processed": 8526,
+      "processing_rate_per_second": 8.83
+    },
+    "city_results": [
+      {
+        "city": "Helsinki",
+        "status": "completed",
+        "listings_new": 7674,
+        "listings_failed": 852,
+        "execution_time": 965.520454
+      }
+    ]
+  }
+}

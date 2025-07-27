@@ -1,0 +1,62 @@
+{
+  "backup_name": "backup_20250721_005501",
+  "created_at": "2025-07-21T00:55:01.641398",
+  "components": {
+    "database": {
+      "status": "success",
+      "files": [
+        {
+          "file": "data/real_estate.duckdb",
+          "size_mb": 1228.76171875
+        }
+      ],
+      "size_mb": 1228.76171875
+    },
+    "configuration": {
+      "status": "success",
+      "files": [],
+      "size_mb": 0
+    },
+    "logs": {
+      "status": "success",
+      "files": [
+        {
+          "file": "logs\\audit.log",
+          "size_mb": 0.000335693359375
+        },
+        {
+          "file": "logs\\scraper_2025-07-17.log",
+          "size_mb": 0.1886301040649414
+        },
+        {
+          "file": "logs\\scraper_2025-07-18.log",
+          "size_mb": 0.052338600158691406
+        },
+        {
+          "file": "logs\\scraper_2025-07-19.log",
+          "size_mb": 1.326979637145996
+        },
+        {
+          "file": "logs\\scraper_2025-07-20.log",
+          "size_mb": 0.3074607849121094
+        },
+        {
+          "file": "logs\\scraper_2025-07-21.log",
+          "size_mb": 0.11130523681640625
+        },
+        {
+          "file": "logs\\task_15_completion_20250719_060200.log",
+          "size_mb": 0.00508880615234375
+        }
+      ],
+      "size_mb": 1.9921388626098633
+    },
+    "security": {
+      "status": "success",
+      "files": [],
+      "size_mb": 0
+    }
+  },
+  "total_size_mb": 1230.7538576126099,
+  "backup_version": "1.0"
+}

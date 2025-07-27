@@ -24,9 +24,9 @@ import shutil
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from oikotie.automation.orchestrator import EnhancedScraperOrchestrator
+from oikotie.automation.orchestrator import EnhancedScraperOrchestrator, ScraperConfig
 from oikotie.automation.scheduler import TaskScheduler
-from oikotie.automation.config_manager import ConfigurationManager
+from oikotie.automation.config_manager import ConfigurationManager, ScraperConfiguration
 from oikotie.automation.monitoring import ComprehensiveMonitor
 from oikotie.automation.reporting import StatusReporter
 from oikotie.automation.alerting import AlertManager
@@ -90,6 +90,22 @@ class TestEndToEndWorkflows(unittest.TestCase):
         successful_workflows = sum(1 for r in self.workflow_results.values() if r.get('success', False))
         print(f"   Successful workflows: {successful_workflows}/{len(self.workflow_results)}")
     
+    def _convert_to_scraper_config(self, scraper_config: ScraperConfiguration, city: str = "Helsinki") -> ScraperConfig:
+        """Convert ScraperConfiguration to ScraperConfig for orchestrator"""
+        return ScraperConfig(
+            city=city,
+            url=f"https://asunnot.oikotie.fi/myytavat-asunnot/{city.lower()}",
+            listing_limit=self.e2e_config.get('max_listings_per_city', 15),
+            max_detail_workers=5,
+            staleness_threshold_hours=scraper_config.scraping.staleness_threshold_hours,
+            retry_limit=scraper_config.scraping.max_retries,
+            retry_delay_hours=1,
+            batch_size=scraper_config.scraping.batch_size,
+            enable_smart_deduplication=scraper_config.scraping.enable_deduplication,
+            enable_performance_monitoring=True,
+            headless_browser=True
+        )
+    
     def test_01_complete_daily_automation_workflow(self):
         """Test complete daily automation workflow from start to finish"""
         print("\n🌅 Testing Complete Daily Automation Workflow...")
@@ -151,7 +167,8 @@ class TestEndToEndWorkflows(unittest.TestCase):
             print("   Step 3: Smart Deduplication Planning...")
             step_start = time.time()
             
-            orchestrator = EnhancedScraperOrchestrator(config=config, db_manager=db_manager)
+            scraper_config = self._convert_to_scraper_config(config)
+            orchestrator = EnhancedScraperOrchestrator(config=scraper_config, db_manager=db_manager)
             
             # Plan execution with smart deduplication
             execution_plan = orchestrator.plan_execution('Helsinki')
@@ -252,7 +269,7 @@ class TestEndToEndWorkflows(unittest.TestCase):
             step_start = time.time()
             
             # Test alerting system
-            alert_manager = AlertManager(config=config)
+            alert_manager = AlertManager(config=config.alerting)
             
             # Check for alert conditions
             alert_conditions = alert_manager.evaluate_alert_conditions(execution_result)
@@ -351,7 +368,8 @@ class TestEndToEndWorkflows(unittest.TestCase):
             
             # Test manual execution trigger
             db_manager = EnhancedDatabaseManager()
-            orchestrator = EnhancedScraperOrchestrator(config=config, db_manager=db_manager)
+            scraper_config = self._convert_to_scraper_config(config)
+            orchestrator = EnhancedScraperOrchestrator(config=scraper_config, db_manager=db_manager)
             
             # Simulate scheduled execution
             start_time = time.time()
@@ -387,7 +405,8 @@ class TestEndToEndWorkflows(unittest.TestCase):
             config_manager = ConfigurationManager()
             config = config_manager.load_config_from_dict(self.e2e_config)
             
-            orchestrator = EnhancedScraperOrchestrator(config=config, db_manager=db_manager)
+            scraper_config = self._convert_to_scraper_config(config)
+            orchestrator = EnhancedScraperOrchestrator(config=scraper_config, db_manager=db_manager)
             
             # Test error scenarios and recovery
             error_scenarios = [
@@ -443,14 +462,15 @@ class TestEndToEndWorkflows(unittest.TestCase):
                 system_monitor_interval=5
             )
             
-            alert_manager = AlertManager(config=config)
+            alert_manager = AlertManager(config=config.alerting)
             
             # Start monitoring
             monitor.start_monitoring()
             
             # Simulate system activity
             db_manager = EnhancedDatabaseManager()
-            orchestrator = EnhancedScraperOrchestrator(config=config, db_manager=db_manager)
+            scraper_config = self._convert_to_scraper_config(config)
+            orchestrator = EnhancedScraperOrchestrator(config=scraper_config, db_manager=db_manager)
             
             # Execute scraping while monitoring
             start_time = time.time()
@@ -507,7 +527,8 @@ class TestEndToEndWorkflows(unittest.TestCase):
             config_manager = ConfigurationManager()
             config = config_manager.load_config_from_dict(self.e2e_config)
             
-            orchestrator = EnhancedScraperOrchestrator(config=config, db_manager=db_manager)
+            scraper_config = self._convert_to_scraper_config(config)
+            orchestrator = EnhancedScraperOrchestrator(config=scraper_config, db_manager=db_manager)
             
             # Test data pipeline stages
             pipeline_stages = []
@@ -517,7 +538,7 @@ class TestEndToEndWorkflows(unittest.TestCase):
             stage_start = time.time()
             
             collection_result = orchestrator.run_daily_scrape()
-            collection_success = collection_result.get('status') in ['success', 'completed']
+            collection_success = collection_result.status.value in ['success', 'completed']
             
             stage1_time = time.time() - stage_start
             pipeline_stages.append({

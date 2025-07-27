@@ -7,6 +7,9 @@ Welcome to the comprehensive deployment documentation for the Oikotie Daily Scra
 ### Quick Start Guides
 - **[Deployment Guide](README.md)** - Complete deployment guide for all scenarios
 - **[Configuration Examples](configuration-examples.md)** - Ready-to-use configuration templates
+- **[Multi-City Best Practices](multi-city-best-practices.md)** - Best practices for multi-city deployments
+- **[CLI Commands](cli-commands.md)** - Comprehensive CLI command documentation
+- **[Multi-City Troubleshooting](multi-city-troubleshooting.md)** - Troubleshooting multi-city issues
 - **[Troubleshooting Guide](troubleshooting-guide.md)** - Common issues and solutions
 - **[Operational Runbooks](operational-runbooks.md)** - Step-by-step operational procedures
 

@@ -9,6 +9,7 @@ compatibility with the existing scraper architecture.
 import json
 import time
 import uuid
+import threading
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
@@ -94,15 +95,32 @@ class DataQualityReport:
 class EnhancedDatabaseManager:
     """Enhanced database manager with automation capabilities."""
     
+    _instances = {}
+    _lock = threading.Lock()
+    
+    def __new__(cls, db_path: str = "data/real_estate.duckdb"):
+        """Implement singleton pattern per database path to prevent connection conflicts."""
+        with cls._lock:
+            if db_path not in cls._instances:
+                instance = super().__new__(cls)
+                cls._instances[db_path] = instance
+            return cls._instances[db_path]
+    
     def __init__(self, db_path: str = "data/real_estate.duckdb"):
+        # Only initialize once per instance
+        if hasattr(self, '_initialized'):
+            return
+            
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         
         self.schema = DatabaseSchema(str(self.db_path))
         self.migration_manager = MigrationManager(str(self.db_path))
+        self._connection_lock = threading.Lock()
         
         logger.info(f"Enhanced database manager initialized: {self.db_path}")
         self._initialize_database()
+        self._initialized = True
     
     def _initialize_database(self) -> None:
         """Initialize database with schema and migrations."""
@@ -125,7 +143,8 @@ class EnhancedDatabaseManager:
     
     def get_connection(self):
         """Get a database connection for direct queries."""
-        return duckdb.connect(str(self.db_path))
+        with self._connection_lock:
+            return duckdb.connect(str(self.db_path))
     
     def get_stale_listings(self, staleness_threshold: timedelta = timedelta(hours=24)) -> List[ListingRecord]:
         """Get listings that need re-scraping based on staleness threshold."""

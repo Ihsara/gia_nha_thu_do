@@ -38,8 +38,16 @@ CITY_CONFIGS = {
         center_lat=60.1695,
         center_lon=24.9354,
         zoom_level=12,
-        bbox=(24.7, 60.1, 25.2, 60.3),
-        database_filter="address LIKE '%Helsinki%'"
+        bbox=(24.5, 60.0, 25.5, 60.5),
+        database_filter="city = 'Helsinki' OR address LIKE '%Helsinki%'"
+    ),
+    'espoo': CityConfig(
+        name='Espoo',
+        center_lat=60.2055,
+        center_lon=24.6522,
+        zoom_level=12,
+        bbox=(24.4, 60.1, 24.9, 60.4),
+        database_filter="city = 'Espoo' OR address LIKE '%Espoo%'"
     ),
     'tampere': CityConfig(
         name='Tampere', 
@@ -47,7 +55,7 @@ CITY_CONFIGS = {
         center_lon=23.7871,
         zoom_level=12,
         bbox=(23.6, 61.4, 23.9, 61.6),
-        database_filter="address LIKE '%Tampere%'"
+        database_filter="city = 'Tampere' OR address LIKE '%Tampere%'"
     ),
     'turku': CityConfig(
         name='Turku',
@@ -55,7 +63,7 @@ CITY_CONFIGS = {
         center_lon=22.2666,
         zoom_level=12,
         bbox=(22.1, 60.3, 22.4, 60.6),
-        database_filter="address LIKE '%Turku%'"
+        database_filter="city = 'Turku' OR address LIKE '%Turku%'"
     )
 }
 
@@ -136,6 +144,78 @@ def get_city_config(city: str) -> CityConfig:
     return CITY_CONFIGS[city_lower]
 
 
+def validate_city_config(city_config: CityConfig) -> bool:
+    """Validate a city configuration for completeness and correctness."""
+    try:
+        # Check required fields
+        if not city_config.name or not isinstance(city_config.name, str):
+            raise ValueError(f"Invalid city name: {city_config.name}")
+        
+        # Check coordinates are valid
+        if not (-90 <= city_config.center_lat <= 90):
+            raise ValueError(f"Invalid latitude: {city_config.center_lat}")
+        
+        if not (-180 <= city_config.center_lon <= 180):
+            raise ValueError(f"Invalid longitude: {city_config.center_lon}")
+        
+        # Check zoom level is reasonable
+        if not (1 <= city_config.zoom_level <= 20):
+            raise ValueError(f"Invalid zoom level: {city_config.zoom_level}")
+        
+        # Check bounding box if provided
+        if city_config.bbox:
+            if len(city_config.bbox) != 4:
+                raise ValueError(f"Bounding box must have 4 coordinates: {city_config.bbox}")
+            
+            min_lon, min_lat, max_lon, max_lat = city_config.bbox
+            
+            if not (min_lon < max_lon and min_lat < max_lat):
+                raise ValueError(f"Invalid bounding box coordinates: {city_config.bbox}")
+            
+            if not (-180 <= min_lon <= 180 and -180 <= max_lon <= 180):
+                raise ValueError(f"Invalid longitude bounds: {min_lon}, {max_lon}")
+            
+            if not (-90 <= min_lat <= 90 and -90 <= max_lat <= 90):
+                raise ValueError(f"Invalid latitude bounds: {min_lat}, {max_lat}")
+        
+        # Check database filter if provided
+        if city_config.database_filter and not isinstance(city_config.database_filter, str):
+            raise ValueError(f"Database filter must be a string: {city_config.database_filter}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ City configuration validation failed for {city_config.name}: {e}")
+        return False
+
+
+def get_available_cities() -> list:
+    """Get list of available city names."""
+    return list(CITY_CONFIGS.keys())
+
+
+def validate_all_city_configs() -> Dict[str, bool]:
+    """Validate all predefined city configurations."""
+    results = {}
+    for city_name, city_config in CITY_CONFIGS.items():
+        results[city_name] = validate_city_config(city_config)
+    return results
+
+
+def get_city_database_filter(city: str) -> str:
+    """Get database filter query for a specific city."""
+    city_config = get_city_config(city)
+    return city_config.database_filter or f"city = '{city_config.name}'"
+
+
+def get_city_bounds(city: str) -> tuple:
+    """Get bounding box coordinates for a specific city."""
+    city_config = get_city_config(city)
+    if not city_config.bbox:
+        raise ValueError(f"No bounding box defined for city: {city}")
+    return city_config.bbox
+
+
 def get_default_config() -> Dict[str, Any]:
     """Get default configuration dictionary."""
     return {
@@ -151,14 +231,39 @@ if __name__ == "__main__":
     print("=" * 40)
     
     # Test city configurations
-    for city_name in CITY_CONFIGS.keys():
+    print("\n🏙️ Available Cities:")
+    for city_name in get_available_cities():
         city = get_city_config(city_name)
-        print(f"🏙️ {city.name}: {city.center_lat}, {city.center_lon}")
+        print(f"  • {city.name}: {city.center_lat}, {city.center_lon} (zoom: {city.zoom_level})")
+        print(f"    Bounds: {city.bbox}")
+        print(f"    Filter: {city.database_filter}")
+    
+    # Test configuration validation
+    print("\n✅ Configuration Validation:")
+    validation_results = validate_all_city_configs()
+    for city_name, is_valid in validation_results.items():
+        status = "✅ Valid" if is_valid else "❌ Invalid"
+        print(f"  • {city_name}: {status}")
+    
+    # Test specific city functions
+    print("\n🔍 Testing Espoo Configuration:")
+    try:
+        espoo_config = get_city_config('espoo')
+        print(f"  • Name: {espoo_config.name}")
+        print(f"  • Center: {espoo_config.center_lat}, {espoo_config.center_lon}")
+        print(f"  • Bounds: {get_city_bounds('espoo')}")
+        print(f"  • Database Filter: {get_city_database_filter('espoo')}")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
     
     # Test output configuration
+    print(f"\n📁 Output Configuration:")
     output = OutputConfig()
-    print(f"📁 Dashboard dir: {output.dashboard_dir}")
+    print(f"  • Dashboard dir: {output.dashboard_dir}")
+    print(f"  • Maps dir: {output.maps_dir}")
     
     # Test database configuration
+    print(f"\n🗄️ Database Configuration:")
     db = DatabaseConfig()
-    print(f"🗄️ Database: {db.duckdb_path} ({'✅ exists' if db.validate_database() else '❌ missing'})")
+    print(f"  • Database: {db.duckdb_path} ({'✅ exists' if db.validate_database() else '❌ missing'})")
+    print(f"  • Listings table: {db.listings_table}")

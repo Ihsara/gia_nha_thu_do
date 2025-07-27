@@ -18,7 +18,7 @@ services:
     networks:
       - scraper-network
 
-  # Scraper node 1
+  # Scraper node 1 - Helsinki focused
   scraper-node-1:
     build:
       context: .
@@ -35,11 +35,25 @@ services:
       - LOG_LEVEL=INFO
       - HEADLESS_BROWSER=true
       - MAX_WORKERS=3
+      - MULTI_CITY_ENABLED=true
+      - PRIMARY_CITY=Helsinki
+      - ENABLE_CITY_METRICS=true
+      - BACKUP_ENABLED=true
+      - BACKUP_RETENTION_DAYS=7
+      - CITY_SPECIFIC_ALERTING=true
+      - DISASTER_RECOVERY_ENABLED=true
+      - BACKUP_ENCRYPTION_ENABLED=true
+      - HEALTH_CHECK_CITIES=Helsinki,Espoo
+      - METRICS_EXPORT_INTERVAL=30
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
+      - BACKUP_S3_REGION=${BACKUP_S3_REGION:-us-east-1}
     ports:
       - "8081:8080"
     volumes:
       - shared_data:/shared
       - node1_logs:/logs
+      - shared_backups:/backups
     depends_on:
       redis:
         condition: service_healthy
@@ -52,7 +66,7 @@ services:
     networks:
       - scraper-network
 
-  # Scraper node 2
+  # Scraper node 2 - Espoo focused
   scraper-node-2:
     build:
       context: .
@@ -69,11 +83,23 @@ services:
       - LOG_LEVEL=INFO
       - HEADLESS_BROWSER=true
       - MAX_WORKERS=3
+      - MULTI_CITY_ENABLED=true
+      - PRIMARY_CITY=Espoo
+      - ENABLE_CITY_METRICS=true
+      - CITY_SPECIFIC_ALERTING=true
+      - DISASTER_RECOVERY_ENABLED=true
+      - BACKUP_ENCRYPTION_ENABLED=true
+      - HEALTH_CHECK_CITIES=Helsinki,Espoo
+      - METRICS_EXPORT_INTERVAL=30
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
+      - BACKUP_S3_REGION=${BACKUP_S3_REGION:-us-east-1}
     ports:
       - "8082:8080"
     volumes:
       - shared_data:/shared
       - node2_logs:/logs
+      - shared_backups:/backups
     depends_on:
       redis:
         condition: service_healthy
@@ -100,22 +126,60 @@ services:
     networks:
       - scraper-network
 
-  # Monitoring (optional)
+  # Enhanced monitoring stack
   prometheus:
     image: prom/prometheus:latest
     container_name: scraper-prometheus
     ports:
       - "9090:9090"
     volumes:
-      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
+      - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--alertmanager.url=http://alertmanager:9093'
+    networks:
+      - scraper-network
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: scraper-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - alertmanager_data:/alertmanager
+      - ./docker/alertmanager:/etc/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.listen-address=0.0.0.0:9094'
+    networks:
+      - scraper-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: scraper-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - ./docker/grafana/dashboards:/etc/grafana/dashboards
+    depends_on:
+      - prometheus
     networks:
       - scraper-network
 
@@ -129,6 +193,12 @@ volumes:
   node2_logs:
     driver: local
   prometheus_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  grafana_data:
+    driver: local
+  shared_backups:
     driver: local
 
 networks:

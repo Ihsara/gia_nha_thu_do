@@ -85,6 +85,7 @@ class ScrapingConfig:
     staleness_threshold_hours: int = 24
     enable_deduplication: bool = True
     geocoding_timeout: int = 10
+    batch_size: int = 100
 
 
 @dataclass
@@ -132,10 +133,20 @@ class SchedulingConfig:
     """Scheduling configuration."""
     enabled: bool = True
     cron_expression: str = "0 2 * * *"  # Daily at 2 AM
+    default_schedule: str = "0 2 * * *"  # Daily at 2 AM
     timezone: str = "UTC"
     
     # Execution settings
     max_execution_time: int = 7200  # 2 hours
+    max_concurrent_tasks: int = 1
+    task_timeout: int = 3600  # 1 hour
+    retry_attempts: int = 3
+    retry_delay: int = 300  # 5 minutes
+    resource_limits: Dict[str, Any] = field(default_factory=lambda: {
+        'max_memory_mb': 2048,
+        'max_cpu_percent': 80,
+        'max_disk_usage_percent': 90
+    })
     enable_manual_trigger: bool = True
     prevent_overlapping: bool = True
 
@@ -145,6 +156,10 @@ class AlertingConfig:
     """Alerting configuration."""
     enabled: bool = True
     config_file: str = "config/alert_config.json"
+    
+    # Alert conditions and channels (will be loaded from config file)
+    alert_conditions: List[Any] = field(default_factory=list)
+    notification_channels: List[Any] = field(default_factory=list)
     
     # Rate limiting
     max_alerts_per_hour: int = 50

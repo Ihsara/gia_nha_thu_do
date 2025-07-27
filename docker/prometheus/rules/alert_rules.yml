@@ -1,0 +1,87 @@
+groups:
+- name: oikotie_scraper_alerts
+  rules:
+  # System-level alerts
+  - alert: HighCPUUsage
+    expr: avg(process_cpu_seconds_total{job="scraper-nodes"}) > 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage detected"
+      description: "CPU usage is above 80% for 5 minutes on {{ $labels.instance }}"
+
+  - alert: HighMemoryUsage
+    expr: avg(process_resident_memory_bytes{job="scraper-nodes"}) / 1024 / 1024 / 1024 > 0.9
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage detected"
+      description: "Memory usage is above 90% for 5 minutes on {{ $labels.instance }}"
+
+  - alert: InstanceDown
+    expr: up{job="scraper-nodes"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Instance {{ $labels.instance }} down"
+      description: "{{ $labels.instance }} has been down for more than 1 minute"
+
+  # City-specific alerts
+  - alert: CityScrapingFailure
+    expr: scraper_city_scraping_failures_total{job="city-metrics"} > 5
+    for: 10m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Scraping failures for {{ $labels.city }}"
+      description: "{{ $labels.city }} has experienced more than 5 scraping failures in the last 10 minutes"
+
+  - alert: LowGeospatialMatchRate
+    expr: scraper_city_geospatial_match_rate{job="city-metrics"} < 0.95
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low geospatial match rate for {{ $labels.city }}"
+      description: "{{ $labels.city }} has a geospatial match rate below 95% for 30 minutes"
+
+  - alert: HighErrorRate
+    expr: rate(scraper_city_errors_total{job="city-metrics"}[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High error rate for {{ $labels.city }}"
+      description: "{{ $labels.city }} has a high error rate (>10%) for 5 minutes"
+
+  # Database alerts
+  - alert: DatabaseConnectionFailures
+    expr: scraper_database_connection_failures_total > 3
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Database connection failures"
+      description: "More than 3 database connection failures in 5 minutes"
+
+  # Backup alerts
+  - alert: BackupFailure
+    expr: scraper_backup_failures_total > 0
+    for: 1h
+    labels:
+      severity: critical
+    annotations:
+      summary: "Backup failure detected"
+      description: "Backup process has failed in the last hour"
+
+  - alert: OldBackup
+    expr: time() - scraper_last_successful_backup_timestamp > 86400
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "Backup is too old"
+      description: "Last successful backup is more than 24 hours old"

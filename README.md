@@ -14,6 +14,8 @@ The Oikotie Analytics Platform automates the collection of property listings fro
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
+- [Multi-City Support](#multi-city-support)
+- [Testing](#testing)
 - [Documentation](#documentation)
 - [Development](#development)
 - [Research & Citation](#research--citation)
@@ -147,27 +149,41 @@ pip install -e .
 
 ### Command-Line Interface
 
-The platform provides a comprehensive CLI for common tasks:
+The platform provides a comprehensive CLI for common tasks with multi-city support:
 
 ```bash
-# Generate enhanced interactive dashboard
+# Generate enhanced interactive dashboard for Helsinki (default)
 uv run python -m oikotie.visualization.cli.commands dashboard --enhanced --open
 
-# Analyze specific buildings
-uv run python -m oikotie.visualization.cli.commands analyze --building-id OSM_12345
+# Generate enhanced dashboard for Espoo
+uv run python -m oikotie.visualization.cli.commands dashboard --city espoo --enhanced --open
 
-# Validate data quality
-uv run python -m oikotie.visualization.cli.commands validate --schema --sample
+# Generate comparative dashboard for Helsinki and Espoo
+uv run python -m oikotie.visualization.cli.commands dashboard --comparative "helsinki,espoo" --open
 
-# Get system information
-uv run python -m oikotie.visualization.cli.commands info
+# Show city selector interface
+uv run python -m oikotie.visualization.cli.commands dashboard --selector --open
+
+# Run multi-city daily automation
+uv run python -m oikotie.automation.cli run --daily
+
+# Validate Espoo data quality
+uv run python -m oikotie.visualization.cli.commands validate --city espoo --schema --sample
+
+# Run progressive validation for Espoo
+uv run python run_espoo_validation.py
 ```
 
 **Available CLI Options:**
 - `--enhanced`: Enable enhanced dashboard features with building footprints
 - `--open`: Automatically open generated dashboard in browser
 - `--output`: Specify custom output directory
-- `--city`: Select city (helsinki, tampere, turku)
+- `--city`: Select city (helsinki, espoo, tampere, turku)
+- `--comparative`: Generate comparative dashboard for multiple cities (comma-separated)
+- `--selector`: Show city selection interface
+- `--sample-size`: Number of listings to include (default: 2000)
+- `--priority`: Set city processing priority (1=highest)
+- `--validate-coordinates`: Validate coordinates against city boundaries
 
 ### Python API Usage
 
@@ -241,11 +257,23 @@ uv run python -m oikotie.visualization.cli.commands dashboard --enhanced
 # ✅ Multi-mode view system (Direct/Buffer/No-match)
 # ✅ Interactive controls (toggles, filters, sliders)
 # ✅ Building footprint visualization with OSM data
+
+# Espoo-specific enhanced dashboard
+uv run python -m oikotie.visualization.cli.commands dashboard --city espoo --enhanced --open
+# ✅ Espoo-specific styling and color scheme
+# ✅ Espoo building footprints visualization
+# ✅ Espoo boundary rendering and map styling
+
+# Multi-city comparative dashboard
+uv run python -m oikotie.visualization.cli.commands dashboard --comparative "helsinki,espoo" --open
+# ✅ Side-by-side city comparison
+# ✅ Cross-city statistical analysis
+# ✅ Multi-city map visualization
 ```
 
 ### Configuration
 
-Edit `config/config.json` to customize scraping parameters:
+Edit `config/config.json` to customize scraping parameters for multiple cities:
 
 ```json
 {
@@ -253,40 +281,91 @@ Edit `config/config.json` to customize scraping parameters:
     {
       "city": "Helsinki",
       "enabled": true,
-      "url": "https://asunnot.oikotie.fi/myytavat-asunnot/helsinki",
-      "max_detail_workers": 5
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "max_detail_workers": 5,
+      "rate_limit_seconds": 1.0,
+      "coordinate_bounds": [24.5, 60.0, 25.5, 60.5],
+      "geospatial_sources": [
+        "helsinki_open_data",
+        "osm_buildings",
+        "national_geodata"
+      ],
+      "priority": 1,
+      "data_governance": {
+        "max_requests_per_second": 1,
+        "bulk_download_preference": true,
+        "cache_duration_hours": 24
+      }
     },
     {
       "city": "Espoo",
-      "enabled": false,
-      "url": "https://asunnot.oikotie.fi/myytavat-asunnot/espoo",
-      "max_detail_workers": 3
+      "enabled": true,
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B49,6,%22Espoo%22%5D%5D&cardType=100",
+      "max_detail_workers": 5,
+      "rate_limit_seconds": 1.0,
+      "coordinate_bounds": [24.4, 60.1, 24.9, 60.4],
+      "geospatial_sources": [
+        "espoo_open_data",
+        "osm_buildings",
+        "national_geodata"
+      ],
+      "priority": 2,
+      "data_governance": {
+        "max_requests_per_second": 1,
+        "bulk_download_preference": true,
+        "cache_duration_hours": 24
+      }
     }
-  ]
+  ],
+  "global_settings": {
+    "database_path": "data/real_estate.duckdb",
+    "output_directory": "output",
+    "log_level": "INFO",
+    "cluster_coordination": {
+      "redis_url": "redis://localhost:6379",
+      "heartbeat_interval": 30,
+      "work_distribution_strategy": "round_robin"
+    }
+  }
 }
 ```
+
+### Daily Automation System
+
+The platform includes a comprehensive daily automation system for production use:
+
+```bash
+# Run daily automation for all enabled cities
+uv run python -m oikotie.automation.cli run --daily
+
+# Deploy production system
+uv run python -m oikotie.automation.cli production deploy --type standalone
+
+# Start production monitoring dashboard
+uv run python -m oikotie.automation.cli production dashboard --port 8090
+
+# Validate production readiness
+uv run python -m oikotie.automation.cli production validate
+```
+
+**Automation Features:**
+- **Smart Daily Execution**: Intelligent deduplication prevents re-processing recent listings
+- **Flexible Deployment**: Standalone, container, or cluster deployment options
+- **Production Dashboard**: Real-time monitoring and operational control
+- **Comprehensive Monitoring**: Health checks, metrics, and alerting
+- **Security & Backup**: Built-in security features and automated backup procedures
 
 ### Distributed Cluster Execution
 
 For large-scale operations, the platform supports distributed execution across multiple nodes:
 
-```python
-from oikotie.automation.cluster import create_cluster_coordinator, WorkItem
+```bash
+# Setup Redis coordination
+docker run -d --name redis -p 6379:6379 redis:alpine
 
-# Create cluster coordinator
-coordinator = create_cluster_coordinator("redis://localhost:6379")
-
-# Start health monitoring
-coordinator.start_health_monitoring()
-
-# Create and distribute work
-work_items = [
-    WorkItem(work_id="helsinki-1", city="Helsinki", url="https://..."),
-    WorkItem(work_id="espoo-1", city="Espoo", url="https://...")
-]
-
-result = coordinator.distribute_work(work_items)
-print(f"Distributed {result.distributed_items} items across cluster")
+# Start cluster nodes
+export REDIS_URL=redis://localhost:6379
+uv run python -m oikotie.automation.cli run --cluster
 ```
 
 **Cluster Features:**
@@ -333,6 +412,198 @@ The platform includes comprehensive Jupyter notebooks for data exploration:
 | `pytest tests/validation/test_full_helsinki.py` | Full Helsinki dataset validation |
 | `pytest tests/validation/test_package_imports.py` | Package structure validation |
 
+## Multi-City Support
+
+The platform provides comprehensive support for multiple Finnish cities, currently supporting **Helsinki** and **Espoo** with the same feature set and data quality standards.
+
+### Supported Cities
+
+| City | Status | Features | Data Sources |
+|------|--------|----------|--------------|
+| **Helsinki** | ✅ Production Ready | Full feature set | Helsinki Open Data, OSM, National Geodata |
+| **Espoo** | ✅ Production Ready | Full feature set | Espoo Open Data, OSM, National Geodata |
+
+### Multi-City Configuration
+
+Configure multiple cities in `config/config.json`:
+
+```json
+{
+  "tasks": [
+    {
+      "city": "Helsinki",
+      "enabled": true,
+      "coordinate_bounds": [24.5, 60.0, 25.5, 60.5],
+      "geospatial_sources": ["helsinki_open_data", "osm_buildings"]
+    },
+    {
+      "city": "Espoo", 
+      "enabled": true,
+      "coordinate_bounds": [24.4, 60.1, 24.9, 60.4],
+      "geospatial_sources": ["espoo_open_data", "osm_buildings"]
+    }
+  ]
+}
+```
+
+### Multi-City Operations
+
+```bash
+# Run automation for all enabled cities
+uv run python -m oikotie.automation.cli run --daily
+
+# Generate multi-city comparative dashboard
+uv run python -m oikotie.visualization.cli.commands dashboard --comparative "helsinki,espoo" --open
+
+# City-specific operations
+uv run python -m oikotie.visualization.cli.commands dashboard --city helsinki --enhanced
+uv run python -m oikotie.visualization.cli.commands dashboard --city espoo --enhanced
+
+# Multi-city validation
+uv run python -m tests.validation.test_multi_city_workflow
+```
+
+### Multi-City Features
+
+- **Concurrent Processing**: Process multiple cities simultaneously with intelligent work distribution
+- **City-Specific Configuration**: Customizable parameters per city (rate limits, coordinate bounds, data sources)
+- **Unified Database**: Single DuckDB database with proper city separation and indexing
+- **Cross-City Analytics**: Comparative analysis and visualization across cities
+- **Independent Error Handling**: City-specific error handling and recovery mechanisms
+- **Scalable Architecture**: Add new cities with minimal configuration changes
+
+## Testing
+
+The platform includes a comprehensive testing framework with multiple levels of validation to ensure reliability and prevent costly failures.
+
+### Bug Prevention Testing
+
+**MANDATORY**: Run bug prevention tests before any expensive operation (>10 minutes):
+
+```bash
+# Quick bug prevention test (< 1 minute)
+python run_bug_prevention_test.py
+# or
+uv run python run_bug_prevention_test.py
+
+# Comprehensive bug prevention with detailed report
+uv run python tests/integration/multi_city_bug_prevention_test.py
+```
+
+**Bug Prevention Validates:**
+- System requirements (Python version, memory, disk space)
+- Database connectivity and schema
+- Multi-city configuration validation
+- Dependency availability
+- Network connectivity
+- Basic functionality tests
+
+### Progressive Validation Strategy
+
+Follow the **3-step progressive validation** approach:
+
+#### Step 1: Small Sample Validation (10-20 listings, <5 minutes)
+```bash
+# Quick proof of concept
+pytest tests/validation/test_10_samples.py
+uv run python quickcheck/validate_10_listings_osm.py
+
+# Multi-city small sample
+uv run python tests/integration/test_multi_city_integration_suite.py::TestMultiCityIntegrationSuite::test_01_multi_city_end_to_end_workflow
+```
+
+#### Step 2: Medium Scale Validation (100-500 listings, 10-15 minutes)
+```bash
+# Medium scale testing
+pytest tests/validation/test_100_comprehensive_osm.py
+uv run python quickcheck/validate_100_comprehensive_osm.py
+```
+
+#### Step 3: Full Scale Production Validation (≥99.40% match rate)
+```bash
+# Full Helsinki validation
+pytest tests/validation/test_full_helsinki.py
+uv run python quickcheck/validate_full_helsinki_osm.py
+
+# Full multi-city validation
+uv run python tests/integration/comprehensive_integration_test_runner.py --mode production
+```
+
+### Comprehensive Integration Testing
+
+The platform includes a comprehensive integration testing suite for production readiness validation:
+
+```bash
+# Run all integration tests
+uv run python tests/integration/comprehensive_integration_test_runner.py
+
+# Run specific test suites
+uv run python tests/integration/comprehensive_integration_test_runner.py --suites multi_city_integration end_to_end_workflows
+
+# Run critical tests only (quick validation)
+uv run python tests/integration/comprehensive_integration_test_runner.py --mode critical
+
+# Run performance-focused tests
+uv run python tests/integration/comprehensive_integration_test_runner.py --mode performance
+
+# Run with parallel execution
+uv run python tests/integration/comprehensive_integration_test_runner.py --parallel
+```
+
+### Integration Test Categories
+
+| Test Category | Purpose | Duration | Critical |
+|---------------|---------|----------|----------|
+| **Multi-City Integration** | End-to-end multi-city workflow validation | 15 min | ✅ Yes |
+| **End-to-End Workflows** | Complete user journey validation | 10 min | ✅ Yes |
+| **Performance & Load** | Performance testing under various loads | 20 min | No |
+| **Chaos Engineering** | System resilience under failure scenarios | 10 min | No |
+| **Deployment & Rollback** | Deployment validation and rollback testing | 8 min | No |
+
+### Quality Gates
+
+**Technical Correctness:**
+- ≥95% scraping success rate for both cities
+- ≥95% geocoding accuracy for both cities  
+- 100% database constraint compliance
+- 100% API rate limit compliance
+
+**Logical Correctness:**
+- Manual verification of address geocoding accuracy
+- Visual verification of building footprint matching
+- Cross-city data quality consistency validation
+- Real-world sense validation of results
+
+**Performance Acceptability:**
+- Comparable performance to single-city operations
+- Memory usage < 2GB peak during testing
+- Average CPU usage < 80% during operations
+- Database query performance < 1s for standard operations
+
+### Testing Best Practices
+
+1. **Always run bug prevention tests first** - Prevents expensive failures
+2. **Follow progressive validation** - 10 → 100 → full scale approach
+3. **Validate both cities** - Ensure Helsinki and Espoo work correctly
+4. **Monitor resource usage** - Track memory, CPU, and disk usage
+5. **Test deployment scenarios** - Validate all deployment modes
+6. **Document test results** - Keep comprehensive test reports
+
+### Continuous Integration
+
+```bash
+# Pre-commit testing
+python run_bug_prevention_test.py && pytest tests/unit/
+
+# Integration testing pipeline
+python run_bug_prevention_test.py
+pytest tests/validation/test_10_samples.py
+uv run python tests/integration/comprehensive_integration_test_runner.py --mode critical
+
+# Production readiness validation
+uv run python tests/integration/comprehensive_integration_test_runner.py --mode production
+```
+
 ## Documentation
 
 Comprehensive documentation is available in the `docs/` directory:
@@ -345,6 +616,9 @@ Comprehensive documentation is available in the `docs/` directory:
 ### Deployment Documentation
 - **[Deployment Guide](docs/deployment/)** - Complete deployment documentation
 - **[Configuration Examples](docs/deployment/configuration-examples.md)** - Ready-to-use configurations
+- **[Multi-City Best Practices](docs/deployment/multi-city-best-practices.md)** - Best practices for multi-city deployments
+- **[CLI Commands](docs/deployment/cli-commands.md)** - Comprehensive CLI command documentation
+- **[Multi-City Troubleshooting](docs/deployment/multi-city-troubleshooting.md)** - Troubleshooting multi-city issues
 - **[Troubleshooting Guide](docs/deployment/troubleshooting-guide.md)** - Common issues and solutions
 - **[Operational Runbooks](docs/deployment/operational-runbooks.md)** - Step-by-step procedures
 
@@ -428,8 +702,11 @@ oikotie/
 ├── data/                  # Data storage (git-ignored)
 │   └── real_estate.duckdb # Main DuckDB database
 ├── docs/                  # Project documentation
+│   ├── automation/        # Automation system documentation
+│   ├── deployment/        # Deployment guides and examples
 │   ├── errors/            # Error documentation system
-│   └── scripts/           # Script documentation
+│   ├── scripts/           # Script documentation
+│   └── security/          # Security implementation docs
 ├── memory-bank/           # Project knowledge management
 ├── notebooks/             # Jupyter analysis notebooks
 ├── oikotie/              # Main Python package
@@ -449,6 +726,11 @@ oikotie/
 │   └── utils/            # Core utility functions
 ├── output/               # Generated files (git-ignored)
 │   └── visualization/    # Dashboard outputs
+├── scripts/              # Organized utility scripts
+│   ├── automation/       # Automation scripts
+│   ├── demos/            # Demonstration scripts
+│   ├── deployment/       # Deployment scripts
+│   └── testing/          # Testing utilities
 ├── tests/                # Test suite
 │   ├── integration/      # Integration tests
 │   ├── unit/             # Unit tests

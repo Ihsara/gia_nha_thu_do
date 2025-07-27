@@ -361,6 +361,169 @@ from .scheduler_cli import scheduler as scheduler_commands
 cli.add_command(scheduler_commands, name='scheduler')
 
 
+@cli.group()
+@click.pass_context
+def production(ctx):
+    """Production deployment and management commands."""
+    pass
+
+
+@production.command()
+@click.option('--name', default='oikotie-production', help='Deployment name')
+@click.option('--type', 'deployment_type', type=click.Choice(['standalone', 'container', 'cluster']), 
+              default='standalone', help='Deployment type')
+@click.option('--environment', default='production', help='Environment name')
+@click.option('--action', type=click.Choice(['deploy', 'start', 'status', 'backup', 'cleanup']),
+              default='deploy', help='Action to perform')
+@click.pass_context
+def deploy(ctx, name, deployment_type, environment, action):
+    """Deploy and manage production system."""
+    try:
+        from .production_deployment import create_production_deployment, DeploymentType
+        
+        # Create deployment manager
+        config_overrides = {}
+        if ctx.obj.get('config_path'):
+            config_overrides['config_path'] = ctx.obj['config_path']
+        
+        deployment_type_enum = DeploymentType(deployment_type)
+        manager = create_production_deployment(
+            name, deployment_type_enum, environment, config_overrides
+        )
+        
+        if action == 'deploy':
+            # Full deployment
+            if manager.initialize_deployment():
+                if manager.start_production_system():
+                    logger.success("Production deployment completed successfully")
+                    doc_path = manager.generate_production_documentation()
+                    logger.info(f"Documentation generated: {doc_path}")
+                else:
+                    logger.error("Failed to start production system")
+                    sys.exit(1)
+            else:
+                logger.error("Failed to initialize deployment")
+                sys.exit(1)
+        
+        elif action == 'start':
+            if manager.start_production_system():
+                logger.success("Production system started")
+            else:
+                logger.error("Failed to start production system")
+                sys.exit(1)
+        
+        elif action == 'status':
+            status = manager.get_system_status()
+            print(json.dumps(asdict(status), indent=2, default=str))
+        
+        elif action == 'backup':
+            backup_path = manager.create_backup()
+            print(f"Backup created: {backup_path}")
+        
+        elif action == 'cleanup':
+            stats = manager.cleanup_old_data()
+            print(f"Cleanup completed: {stats}")
+    
+    except Exception as e:
+        logger.error(f"Production deployment failed: {e}")
+        sys.exit(1)
+
+
+@production.command()
+@click.option('--port', default=8090, help='Dashboard port')
+@click.pass_context
+def dashboard(ctx, port):
+    """Start production monitoring dashboard."""
+    try:
+        from .production_deployment import create_production_deployment, DeploymentType
+        from .production_dashboard import create_production_dashboard
+        
+        # Create deployment manager
+        config_overrides = {}
+        if ctx.obj.get('config_path'):
+            config_overrides['config_path'] = ctx.obj['config_path']
+        
+        deployment_manager = create_production_deployment(
+            'dashboard-deployment',
+            DeploymentType.STANDALONE,
+            'production',
+            config_overrides
+        )
+        
+        # Initialize deployment
+        if not deployment_manager.initialize_deployment():
+            logger.error("Failed to initialize deployment for dashboard")
+            sys.exit(1)
+        
+        # Create and start dashboard
+        dashboard = create_production_dashboard(deployment_manager, port)
+        if dashboard:
+            logger.info(f"Starting production dashboard on http://localhost:{port}")
+            dashboard.start_dashboard()
+        else:
+            logger.error("Failed to create production dashboard")
+            sys.exit(1)
+    
+    except KeyboardInterrupt:
+        logger.info("Dashboard stopped by user")
+    except Exception as e:
+        logger.error(f"Dashboard failed: {e}")
+        sys.exit(1)
+
+
+@production.command()
+@click.option('--output', help='Output report file path')
+@click.option('--json-output', is_flag=True, help='Output JSON format')
+@click.pass_context
+def validate(ctx, output, json_output):
+    """Run production readiness validation."""
+    try:
+        from .production_readiness import ProductionReadinessValidator
+        
+        # Create validator
+        validator = ProductionReadinessValidator(ctx.obj.get('config_path'))
+        
+        # Run validation
+        logger.info("Running production readiness validation...")
+        report = validator.run_comprehensive_validation()
+        
+        # Output results
+        if json_output:
+            print(json.dumps(asdict(report), indent=2, default=str))
+        else:
+            # Generate markdown report
+            report_path = validator.generate_report_file(report, output)
+            logger.info(f"Production readiness report: {report_path}")
+            
+            # Print summary
+            print(f"\nValidation Summary:")
+            print(f"Overall Status: {report.overall_status.upper()}")
+            print(f"Checks: {report.passed_checks} passed, {report.failed_checks} failed, {report.warning_checks} warnings")
+            
+            if report.overall_status == 'not_ready':
+                print("\n❌ System is NOT ready for production deployment")
+                print("Please address failed checks before proceeding.")
+            elif report.overall_status == 'warnings':
+                print("\n⚠️  System has warnings but may be ready for production")
+                print("Review warnings and proceed with caution.")
+            else:
+                print("\n✅ System is ready for production deployment")
+        
+        # Exit with appropriate code
+        if report.overall_status == 'not_ready':
+            sys.exit(1)
+        elif report.overall_status == 'warnings':
+            sys.exit(2)
+    
+    except Exception as e:
+        logger.error(f"Production validation failed: {e}")
+        sys.exit(1)
+
+
+# Add production commands as a subgroup
+cli.add_command(production)
+
+
 @cli.command()
 @click.option('--output', '-o', type=click.Path(), help='Output file path')
 @click.pass_context

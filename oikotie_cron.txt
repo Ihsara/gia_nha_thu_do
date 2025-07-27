@@ -1,0 +1,1 @@
+0 6 * * * G:\proj\oikotie\run_daily_cron.sh  # Oikotie daily automation at 6 AM

@@ -1,0 +1,115 @@
+# Alertmanager configuration for multi-city scraper monitoring
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@oikotie-scraper.local'
+  smtp_auth_username: ''
+  smtp_auth_password: ''
+  resolve_timeout: 5m
+
+# Routing configuration
+route:
+  group_by: ['alertname', 'city']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.hook'
+  routes:
+  - match:
+      severity: critical
+    receiver: 'critical-alerts'
+    group_wait: 5s
+    repeat_interval: 30m
+  - match:
+      alertname: CityScrapingFailure
+    receiver: 'city-specific-alerts'
+    group_by: ['city']
+    group_wait: 5s
+    repeat_interval: 15m
+  - match:
+      alertname: LowGeospatialMatchRate
+    receiver: 'data-quality-alerts'
+    group_by: ['city']
+    group_wait: 30s
+    repeat_interval: 2h
+
+# Receivers configuration
+receivers:
+- name: 'web.hook'
+  webhook_configs:
+  - url: 'http://localhost:5001/webhook'
+    send_resolved: true
+    http_config:
+      basic_auth:
+        username: 'alert_user'
+        password: 'alert_password'
+
+- name: 'critical-alerts'
+  webhook_configs:
+  - url: 'http://localhost:5001/webhook/critical'
+    send_resolved: true
+    title: 'CRITICAL: {{ .GroupLabels.alertname }}'
+    text: |
+      {{ range .Alerts }}
+      Alert: {{ .Annotations.summary }}
+      Description: {{ .Annotations.description }}
+      City: {{ .Labels.city }}
+      Instance: {{ .Labels.instance }}
+      Severity: {{ .Labels.severity }}
+      {{ end }}
+  email_configs:
+  - to: 'admin@oikotie-scraper.local'
+    subject: 'CRITICAL ALERT: {{ .GroupLabels.alertname }}'
+    body: |
+      {{ range .Alerts }}
+      Alert: {{ .Annotations.summary }}
+      Description: {{ .Annotations.description }}
+      City: {{ .Labels.city }}
+      Instance: {{ .Labels.instance }}
+      Time: {{ .StartsAt }}
+      {{ end }}
+
+- name: 'city-specific-alerts'
+  webhook_configs:
+  - url: 'http://localhost:5001/webhook/city'
+    send_resolved: true
+    title: 'City Alert: {{ .GroupLabels.city }} - {{ .GroupLabels.alertname }}'
+    text: |
+      City: {{ .GroupLabels.city }}
+      {{ range .Alerts }}
+      Alert: {{ .Annotations.summary }}
+      Description: {{ .Annotations.description }}
+      Instance: {{ .Labels.instance }}
+      {{ end }}
+
+- name: 'data-quality-alerts'
+  webhook_configs:
+  - url: 'http://localhost:5001/webhook/quality'
+    send_resolved: true
+    title: 'Data Quality Alert: {{ .GroupLabels.city }}'
+    text: |
+      City: {{ .GroupLabels.city }}
+      {{ range .Alerts }}
+      Alert: {{ .Annotations.summary }}
+      Description: {{ .Annotations.description }}
+      Current Value: {{ .Labels.value }}
+      Threshold: {{ .Labels.threshold }}
+      {{ end }}
+
+# Inhibit rules
+inhibit_rules:
+- source_match:
+    severity: 'critical'
+  target_match:
+    severity: 'warning'
+  equal: ['alertname', 'city', 'instance']
+
+# Silence configuration
+silences:
+  # Example: Silence maintenance windows
+  # - matchers:
+  #   - name: alertname
+  #     value: MaintenanceMode
+  #   startsAt: "2024-01-01T00:00:00Z"
+  #   endsAt: "2024-01-01T06:00:00Z"
+  #   createdBy: "admin"
+  #   comment: "Scheduled maintenance window"

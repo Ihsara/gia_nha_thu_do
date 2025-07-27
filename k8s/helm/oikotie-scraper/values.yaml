@@ -66,6 +66,50 @@ app:
       enabled: true
       url: "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100"
       maxDetailWorkers: 3
+      priority: 1
+      coordinateBounds: [24.5, 60.0, 25.5, 60.5]
+      geospatialSources:
+        - "helsinki_open_data"
+        - "osm_buildings"
+        - "national_geodata"
+      dataGovernance:
+        maxRequestsPerSecond: 1
+        bulkDownloadPreference: true
+        cacheDurationHours: 24
+      failoverConfig:
+        enabled: true
+        backupDataSources: ["cached_data", "alternative_api"]
+        maxFailureThreshold: 3
+      healthCheck:
+        enabled: true
+        interval: "5m"
+        timeout: "30s"
+        successThreshold: 1
+        failureThreshold: 3
+    - name: "Espoo"
+      enabled: true
+      url: "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B49,6,%22Espoo%22%5D%5D&cardType=100"
+      maxDetailWorkers: 3
+      priority: 2
+      coordinateBounds: [24.4, 60.1, 24.9, 60.4]
+      geospatialSources:
+        - "espoo_open_data"
+        - "osm_buildings"
+        - "national_geodata"
+      dataGovernance:
+        maxRequestsPerSecond: 1
+        bulkDownloadPreference: true
+        cacheDurationHours: 24
+      failoverConfig:
+        enabled: true
+        backupDataSources: ["cached_data", "alternative_api"]
+        maxFailureThreshold: 3
+      healthCheck:
+        enabled: true
+        interval: "5m"
+        timeout: "30s"
+        successThreshold: 1
+        failureThreshold: 3
 
 # Service configuration
 service:
@@ -175,12 +219,214 @@ networkPolicy:
 # Monitoring
 monitoring:
   enabled: true
+  citySpecificMetrics: true
+  
+  # Prometheus configuration
+  prometheus:
+    enabled: true
+    retention: "30d"
+    storage: "10Gi"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "200m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  
+  # Alertmanager configuration
+  alertmanager:
+    enabled: true
+    storage: "1Gi"
+    config:
+      global:
+        smtp_smarthost: 'localhost:587'
+        smtp_from: 'alerts@oikotie-scraper.local'
+        resolve_timeout: 5m
+      routes:
+        - match:
+            severity: critical
+          receiver: 'critical-alerts'
+          group_wait: 5s
+          repeat_interval: 30m
+        - match:
+            alertname: CityScrapingFailure
+          receiver: 'city-specific-alerts'
+          group_by: ['city']
+          group_wait: 5s
+          repeat_interval: 15m
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+  
+  # Grafana configuration
+  grafana:
+    enabled: true
+    storage: "2Gi"
+    adminPassword: "admin"
+    plugins:
+      - grafana-piechart-panel
+      - grafana-worldmap-panel
+    dashboards:
+      multiCityOverview:
+        enabled: true
+        title: "Multi-City Scraper Overview"
+      cityComparison:
+        enabled: true
+        title: "City Performance Comparison"
+      geospatialMetrics:
+        enabled: true
+        title: "Geospatial Data Quality"
+      systemHealth:
+        enabled: true
+        title: "System Health & Performance"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "300m"
+  
+  # Service Monitor for Prometheus Operator
   serviceMonitor:
     enabled: true
     interval: 30s
     path: /metrics
     labels: {}
     annotations: {}
+  
+  # Alert rules
+  alertRules:
+    enabled: true
+    rules:
+      system:
+        - name: "HighCPUUsage"
+          expr: "avg(rate(process_cpu_seconds_total{job=\"scraper-nodes\"}[5m])) > 0.8"
+          for: "5m"
+          severity: "warning"
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for 5 minutes on {{ $labels.kubernetes_pod_name }}"
+        - name: "HighMemoryUsage"
+          expr: "(process_resident_memory_bytes{job=\"scraper-nodes\"} / 1024 / 1024 / 1024) > 0.8"
+          for: "5m"
+          severity: "warning"
+          summary: "High memory usage detected"
+          description: "Memory usage is above 800MB for 5 minutes on {{ $labels.kubernetes_pod_name }}"
+        - name: "ScraperPodDown"
+          expr: "up{job=\"scraper-nodes\"} == 0"
+          for: "1m"
+          severity: "critical"
+          summary: "Scraper pod is down"
+          description: "Scraper pod {{ $labels.kubernetes_pod_name }} has been down for more than 1 minute"
+      citySpecific:
+        - name: "CityScrapingFailure"
+          expr: "increase(scraper_city_scraping_failures_total{job=\"city-metrics\"}[10m]) > 5"
+          for: "2m"
+          severity: "critical"
+          summary: "Scraping failures for {{ $labels.city }}"
+          description: "{{ $labels.city }} has experienced {{ $value }} scraping failures in the last 10 minutes"
+        - name: "CityScrapingStalled"
+          expr: "time() - scraper_city_last_successful_scrape_timestamp{job=\"city-metrics\"} > 3600"
+          for: "5m"
+          severity: "critical"
+          summary: "Scraping stalled for {{ $labels.city }}"
+          description: "{{ $labels.city }} hasn't had a successful scrape in over 1 hour"
+        - name: "LowGeospatialMatchRate"
+          expr: "scraper_city_geospatial_match_rate{job=\"city-metrics\"} < 0.95"
+          for: "30m"
+          severity: "warning"
+          summary: "Low geospatial match rate for {{ $labels.city }}"
+          description: "{{ $labels.city }} has a geospatial match rate of {{ $value | humanizePercentage }} (below 95%) for 30 minutes"
+      database:
+        - name: "DatabaseConnectionFailure"
+          expr: "scraper_database_connection_failures_total > 0"
+          for: "1m"
+          severity: "critical"
+          summary: "Database connection failures detected"
+          description: "Database connection failures detected on {{ $labels.kubernetes_pod_name }}: {{ $value }} failures"
+        - name: "DatabaseHighLatency"
+          expr: "histogram_quantile(0.95, rate(scraper_database_query_duration_seconds_bucket[5m])) > 5"
+          for: "10m"
+          severity: "warning"
+          summary: "High database query latency"
+          description: "95th percentile database query latency is {{ $value }}s (above 5s) on {{ $labels.kubernetes_pod_name }}"
+
+# Backup and disaster recovery configuration
+backup:
+  enabled: true
+  schedule: "0 1 * * *"  # Daily at 1 AM
+  retentionDays: 7
+  storageClass: ""
+  size: "5Gi"
+  
+  # Encryption settings
+  encryption:
+    enabled: true
+    algorithm: "AES256"
+    keyRotationDays: 30
+  
+  # Local backup storage
+  local:
+    enabled: true
+    path: "/backups"
+    compression: true
+    compressionLevel: 6
+  
+  # S3 backup configuration
+  s3:
+    enabled: false
+    bucket: ""
+    region: "us-east-1"
+    storageClass: "STANDARD_IA"
+    serverSideEncryption: true
+    accessKey: ""
+    secretKey: ""
+    endpoint: ""  # For S3-compatible services
+  
+  # Backup validation
+  validation:
+    enabled: true
+    checksumAlgorithm: "SHA256"
+    integrityCheck: true
+    restoreTest: false  # Set to true for periodic restore testing
+  
+  # Multi-city backup strategy
+  multiCity:
+    enabled: true
+    separateBackups: true  # Create separate backups per city
+    crossCityReplication: false  # Replicate backups across cities
+    
+# Disaster recovery configuration
+disasterRecovery:
+  enabled: true
+  
+  # Recovery time objectives
+  rto: "4h"  # Recovery Time Objective
+  rpo: "1h"  # Recovery Point Objective
+  
+  # Automated recovery procedures
+  automation:
+    enabled: true
+    healthCheckInterval: "5m"
+    failoverThreshold: 3
+    autoFailback: false
+  
+  # Cross-region replication
+  replication:
+    enabled: false
+    regions: []
+    syncInterval: "1h"
+  
+  # Recovery testing
+  testing:
+    enabled: false
+    schedule: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+    testEnvironment: "staging"
 
 # Ingress
 ingress:

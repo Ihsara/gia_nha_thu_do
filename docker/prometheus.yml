@@ -1,11 +1,16 @@
-# Prometheus configuration for scraper cluster monitoring
+# Prometheus configuration for multi-city scraper cluster monitoring
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
+  - "/etc/prometheus/alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
 
 scrape_configs:
   # Scraper nodes metrics
@@ -15,6 +20,21 @@ scrape_configs:
           - 'scraper-node-1:8080'
           - 'scraper-node-2:8080'
     metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metric_relabel_configs:
+      - source_labels: [city]
+        regex: (.+)
+        target_label: city
+        replacement: $1
+
+  # City-specific metrics
+  - job_name: 'city-metrics'
+    static_configs:
+      - targets: 
+          - 'scraper-node-1:8080'
+          - 'scraper-node-2:8080'
+    metrics_path: '/metrics/cities'
     scrape_interval: 30s
     scrape_timeout: 10s
 

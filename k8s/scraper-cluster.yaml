@@ -44,14 +44,66 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: MULTI_CITY_ENABLED
+          value: "true"
+        - name: ENABLE_CITY_METRICS
+          value: "true"
+        - name: BACKUP_ENABLED
+          value: "true"
+        - name: BACKUP_RETENTION_DAYS
+          value: "7"
+        - name: BACKUP_PATH
+          value: "/backups"
+        - name: CITY_SPECIFIC_ALERTING
+          value: "true"
+        - name: DISASTER_RECOVERY_ENABLED
+          value: "true"
+        - name: BACKUP_ENCRYPTION_ENABLED
+          value: "true"
+        - name: HEALTH_CHECK_CITIES
+          value: "Helsinki,Espoo"
+        - name: METRICS_EXPORT_INTERVAL
+          value: "30"
+        - name: CITY_COORDINATION_ENABLED
+          value: "true"
+        - name: CROSS_CITY_VALIDATION
+          value: "true"
+        - name: MULTI_CITY_BACKUP_STRATEGY
+          value: "separate"
+        - name: CITY_FAILOVER_ENABLED
+          value: "true"
+        - name: GEOSPATIAL_VALIDATION_STRICT
+          value: "true"
+        - name: ALERT_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: scraper-secrets
+              key: alert-webhook-url
+              optional: true
+        - name: BACKUP_S3_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: scraper-secrets
+              key: backup-s3-bucket
+              optional: true
+        - name: BACKUP_S3_REGION
+          valueFrom:
+            secretKeyRef:
+              name: scraper-secrets
+              key: backup-s3-region
+              optional: true
         ports:
         - containerPort: 8080
           name: health
+        - containerPort: 9090
+          name: metrics
         volumeMounts:
         - name: shared-data
           mountPath: /shared
         - name: logs
           mountPath: /logs
+        - name: backups
+          mountPath: /backups
         - name: config
           mountPath: /app/config
           readOnly: true
@@ -91,6 +143,9 @@ spec:
           claimName: scraper-shared-pvc
       - name: logs
         emptyDir: {}
+      - name: backups
+        persistentVolumeClaim:
+          claimName: scraper-backups-pvc
       - name: config
         configMap:
           name: scraper-config
@@ -129,6 +184,19 @@ spec:
 
 ---
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scraper-backups-pvc
+  namespace: oikotie-scraper
+spec:
+  accessModes:
+  - ReadWriteMany  # Shared across multiple pods
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: scraper-config
@@ -143,7 +211,10 @@ data:
         "max_workers": 3,
         "headless_browser": true,
         "enable_metrics": true,
-        "graceful_shutdown_timeout": 30
+        "graceful_shutdown_timeout": 30,
+        "backup_enabled": true,
+        "backup_retention_days": 7,
+        "backup_path": "/backups"
       },
       "tasks": [
         {
@@ -153,9 +224,72 @@ data:
           "max_detail_workers": 3,
           "staleness_threshold_hours": 24,
           "retry_limit": 3,
-          "batch_size": 50
+          "batch_size": 50,
+          "priority": 1,
+          "coordinate_bounds": [24.5, 60.0, 25.5, 60.5],
+          "geospatial_sources": [
+            "helsinki_open_data",
+            "osm_buildings",
+            "national_geodata"
+          ],
+          "data_governance": {
+            "max_requests_per_second": 1,
+            "bulk_download_preference": true,
+            "cache_duration_hours": 24
+          }
+        },
+        {
+          "city": "Espoo",
+          "enabled": true,
+          "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B49,6,%22Espoo%22%5D%5D&cardType=100",
+          "max_detail_workers": 3,
+          "staleness_threshold_hours": 24,
+          "retry_limit": 3,
+          "batch_size": 50,
+          "priority": 2,
+          "coordinate_bounds": [24.4, 60.1, 24.9, 60.4],
+          "geospatial_sources": [
+            "espoo_open_data",
+            "osm_buildings",
+            "national_geodata"
+          ],
+          "data_governance": {
+            "max_requests_per_second": 1,
+            "bulk_download_preference": true,
+            "cache_duration_hours": 24
+          }
         }
-      ]
+      ],
+      "global_settings": {
+        "database_path": "/shared/real_estate.duckdb",
+        "output_directory": "/output",
+        "log_level": "INFO",
+        "cluster_coordination": {
+          "redis_url": "redis://redis:6379",
+          "heartbeat_interval": 30,
+          "work_distribution_strategy": "round_robin"
+        },
+        "monitoring": {
+          "metrics_enabled": true,
+          "health_check_enabled": true,
+          "prometheus_port": 9090,
+          "log_structured": true,
+          "city_specific_metrics": true
+        },
+        "performance": {
+          "batch_size": 50,
+          "concurrent_cities": 2,
+          "memory_limit_mb": 1024,
+          "database_connection_pool_size": 5
+        },
+        "security": {
+          "rate_limiting": {
+            "enabled": true,
+            "requests_per_minute": 60
+          },
+          "audit_logging": true
+        }
+      }
     }
 
 ---

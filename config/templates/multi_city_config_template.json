@@ -1,0 +1,110 @@
+{
+  "tasks": [
+    {
+      "city": "Helsinki",
+      "enabled": true,
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B64,6,%22Helsinki%22%5D%5D&cardType=100",
+      "max_detail_workers": 5,
+      "rate_limit_seconds": 1.0,
+      "coordinate_bounds": [24.5, 60.0, 25.5, 60.5],
+      "geospatial_sources": [
+        "helsinki_open_data",
+        "osm_buildings",
+        "national_geodata"
+      ],
+      "priority": 1,
+      "data_governance": {
+        "max_requests_per_second": 1,
+        "bulk_download_preference": true,
+        "cache_duration_hours": 24
+      }
+    },
+    {
+      "city": "Espoo",
+      "enabled": true,
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B49,6,%22Espoo%22%5D%5D&cardType=100",
+      "max_detail_workers": 5,
+      "rate_limit_seconds": 1.0,
+      "coordinate_bounds": [24.4, 60.1, 24.9, 60.4],
+      "geospatial_sources": [
+        "espoo_open_data",
+        "osm_buildings",
+        "national_geodata"
+      ],
+      "priority": 2,
+      "data_governance": {
+        "max_requests_per_second": 1,
+        "bulk_download_preference": true,
+        "cache_duration_hours": 24
+      }
+    },
+    {
+      "city": "Vantaa",
+      "enabled": false,
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B92,6,%22Vantaa%22%5D%5D&cardType=100",
+      "max_detail_workers": 3,
+      "rate_limit_seconds": 1.0,
+      "coordinate_bounds": [24.7, 60.2, 25.2, 60.4],
+      "geospatial_sources": [
+        "vantaa_open_data",
+        "osm_buildings",
+        "national_geodata"
+      ],
+      "priority": 3,
+      "data_governance": {
+        "max_requests_per_second": 1,
+        "bulk_download_preference": true,
+        "cache_duration_hours": 24
+      }
+    },
+    {
+      "city": "Tampere",
+      "enabled": false,
+      "url": "https://asunnot.oikotie.fi/myytavat-asunnot?locations=%5B%5B837,6,%22Tampere%22%5D%5D&cardType=100",
+      "max_detail_workers": 3,
+      "rate_limit_seconds": 1.0,
+      "coordinate_bounds": [23.6, 61.4, 24.0, 61.7],
+      "geospatial_sources": [
+        "tampere_open_data",
+        "osm_buildings",
+        "national_geodata"
+      ],
+      "priority": 4,
+      "data_governance": {
+        "max_requests_per_second": 1,
+        "bulk_download_preference": true,
+        "cache_duration_hours": 24
+      }
+    }
+  ],
+  "global_settings": {
+    "database_path": "data/real_estate.duckdb",
+    "output_directory": "output",
+    "log_level": "INFO",
+    "max_workers": 10,
+    "cluster_coordination": {
+      "redis_url": "redis://localhost:6379",
+      "heartbeat_interval": 30,
+      "work_distribution_strategy": "round_robin"
+    },
+    "monitoring": {
+      "metrics_enabled": true,
+      "health_check_enabled": true,
+      "prometheus_port": 9090,
+      "log_structured": true
+    },
+    "performance": {
+      "batch_size": 50,
+      "concurrent_cities": 2,
+      "memory_limit_mb": 1024,
+      "database_connection_pool_size": 5
+    },
+    "security": {
+      "rate_limiting": {
+        "enabled": true,
+        "requests_per_minute": 60
+      },
+      "audit_logging": true
+    }
+  }
+}

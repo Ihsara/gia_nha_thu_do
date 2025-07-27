@@ -729,6 +729,130 @@ class TaskScheduler:
             logger.error(f"Error creating orchestrator: {e}")
             return None
     
+    def validate_schedule(self, task_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Validate task schedules and return validation results.
+        
+        Args:
+            task_id: Specific task ID to validate (validates all if None)
+            
+        Returns:
+            Dictionary with validation results
+        """
+        validation_results = {
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'overall_valid': True,
+            'tasks_validated': 0,
+            'tasks_valid': 0,
+            'tasks_invalid': 0,
+            'validation_details': {}
+        }
+        
+        tasks_to_validate = {}
+        if task_id and task_id in self.task_definitions:
+            tasks_to_validate[task_id] = self.task_definitions[task_id]
+        else:
+            tasks_to_validate = self.task_definitions
+        
+        for tid, task_def in tasks_to_validate.items():
+            validation_results['tasks_validated'] += 1
+            task_validation = self._validate_single_task(task_def)
+            validation_results['validation_details'][tid] = task_validation
+            
+            if task_validation['valid']:
+                validation_results['tasks_valid'] += 1
+            else:
+                validation_results['tasks_invalid'] += 1
+                validation_results['overall_valid'] = False
+        
+        logger.info(f"Schedule validation completed: {validation_results['tasks_valid']}/{validation_results['tasks_validated']} tasks valid")
+        return validation_results
+    
+    def _validate_single_task(self, task_def: TaskDefinition) -> Dict[str, Any]:
+        """
+        Validate a single task definition.
+        
+        Args:
+            task_def: Task definition to validate
+            
+        Returns:
+            Dictionary with validation details for the task
+        """
+        validation = {
+            'valid': True,
+            'errors': [],
+            'warnings': [],
+            'cron_valid': False,
+            'next_execution': None,
+            'execution_frequency': None
+        }
+        
+        try:
+            # Validate cron expression
+            cron = croniter(task_def.cron_expression)
+            validation['cron_valid'] = True
+            
+            # Get next few execution times
+            current_time = datetime.now(timezone.utc)
+            next_times = []
+            for _ in range(5):
+                next_time = cron.get_next(datetime)
+                next_times.append(next_time.isoformat())
+            
+            validation['next_execution'] = next_times[0] if next_times else None
+            validation['next_executions'] = next_times
+            
+            # Calculate execution frequency (approximate)
+            if len(next_times) >= 2:
+                first_interval = datetime.fromisoformat(next_times[1]) - datetime.fromisoformat(next_times[0])
+                validation['execution_frequency'] = f"Every {first_interval.total_seconds()} seconds"
+            
+        except Exception as e:
+            validation['valid'] = False
+            validation['cron_valid'] = False
+            validation['errors'].append(f"Invalid cron expression: {e}")
+        
+        # Validate resource limits
+        if task_def.resource_limits:
+            if 'max_memory_mb' in task_def.resource_limits:
+                max_memory = task_def.resource_limits['max_memory_mb']
+                if max_memory <= 0:
+                    validation['errors'].append("max_memory_mb must be positive")
+                    validation['valid'] = False
+                elif max_memory > 16384:  # 16GB
+                    validation['warnings'].append("max_memory_mb is very high (>16GB)")
+            
+            if 'max_cpu_percent' in task_def.resource_limits:
+                max_cpu = task_def.resource_limits['max_cpu_percent']
+                if max_cpu <= 0 or max_cpu > 100:
+                    validation['errors'].append("max_cpu_percent must be between 0 and 100")
+                    validation['valid'] = False
+        
+        # Validate execution time limits
+        if task_def.max_execution_time <= 0:
+            validation['errors'].append("max_execution_time must be positive")
+            validation['valid'] = False
+        elif task_def.max_execution_time > 86400:  # 24 hours
+            validation['warnings'].append("max_execution_time is very long (>24 hours)")
+        
+        # Validate retry configuration
+        if task_def.max_retries < 0:
+            validation['errors'].append("max_retries cannot be negative")
+            validation['valid'] = False
+        elif task_def.max_retries > 10:
+            validation['warnings'].append("max_retries is very high (>10)")
+        
+        if task_def.retry_delay <= 0:
+            validation['errors'].append("retry_delay must be positive")
+            validation['valid'] = False
+        
+        # Validate task type and city
+        if task_def.task_type == "scraper" and not task_def.city:
+            validation['errors'].append("Scraper tasks must specify a city")
+            validation['valid'] = False
+        
+        return validation
+
     def _update_stats(self) -> None:
         """Update scheduler statistics"""
         with self.stats_lock:
@@ -744,6 +868,22 @@ class TaskScheduler:
             
             if recent_executions:
                 completed = [ex for ex in recent_executions if ex.status == TaskStatus.COMPLETED]
+                failed = [ex for ex in recent_executions if ex.status in [TaskStatus.FAILED, TaskStatus.TIMEOUT]]
+                
+                self.stats.completed_tasks = len(completed)
+                self.stats.failed_tasks = len(failed)
+                self.stats.success_rate = len(completed) / len(recent_executions) if recent_executions else 0.0
+                
+                # Calculate average execution time
+                execution_times = [
+                    (ex.completed_time - ex.started_time).total_seconds()
+                    for ex in completed if ex.started_time and ex.completed_time
+                ]
+                self.stats.average_execution_time = sum(execution_times) / len(execution_times) if execution_times else 0.0
+                
+                # Update last execution time
+                if recent_executions:
+                    self.stats.last_execution = max(ex.completed_time for ex in recent_executions if ex.completed_time)
                 failed = [ex for ex in recent_executions if ex.status in [TaskStatus.FAILED, TaskStatus.TIMEOUT]]
                 
                 self.stats.completed_tasks = len(completed)
@@ -787,6 +927,78 @@ class TaskScheduler:
         
         # Try to cancel active execution
         return self.task_executor.cancel_execution(execution_id)
+    
+    def get_schedule_configuration(self) -> Dict[str, Any]:
+        """Get current schedule configuration"""
+        return {
+            'default_schedule': self.scheduling_config.default_schedule,
+            'max_concurrent_tasks': self.scheduling_config.max_concurrent_tasks,
+            'task_timeout': self.scheduling_config.task_timeout,
+            'retry_attempts': self.scheduling_config.retry_attempts,
+            'retry_delay': self.scheduling_config.retry_delay,
+            'resource_limits': self.scheduling_config.resource_limits,
+            'task_definitions': {
+                task_id: {
+                    'name': task_def.name,
+                    'schedule': task_def.schedule,
+                    'enabled': task_def.enabled,
+                    'priority': task_def.priority.name,
+                    'timeout': task_def.timeout,
+                    'retry_attempts': task_def.retry_attempts
+                }
+                for task_id, task_def in self.task_definitions.items()
+            }
+        }
+    
+    def validate_cron_expression(self, cron_expression: str) -> bool:
+        """Validate a cron expression."""
+        try:
+            # Test if croniter can parse the expression
+            cron = croniter(cron_expression)
+            # Try to get next execution time to validate
+            next_time = cron.get_next(datetime)
+            return True
+        except Exception as e:
+            logger.error(f"Invalid cron expression '{cron_expression}': {e}")
+            return False
+    
+    def get_next_execution_time(self, cron_expression: str) -> Optional[datetime]:
+        """Get the next execution time for a cron expression."""
+        try:
+            cron = croniter(cron_expression, datetime.now(timezone.utc))
+            return cron.get_next(datetime)
+        except Exception as e:
+            logger.error(f"Error calculating next execution time for '{cron_expression}': {e}")
+            return None
+    
+    def execute_scheduled_task(self, task_func: Callable) -> Dict[str, Any]:
+        """Execute a scheduled task function and return results."""
+        start_time = time.time()
+        try:
+            result = task_func()
+            execution_time = time.time() - start_time
+            
+            # Handle different result types
+            if hasattr(result, 'status'):
+                status = result.status.value if hasattr(result.status, 'value') else str(result.status)
+            elif isinstance(result, dict):
+                status = result.get('status', 'unknown')
+            else:
+                status = 'completed'
+            
+            return {
+                'status': status,
+                'execution_time': execution_time,
+                'result': result
+            }
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"Scheduled task execution failed: {e}")
+            return {
+                'status': 'failed',
+                'execution_time': execution_time,
+                'error': str(e)
+            }
 
 
 def create_scheduler_from_config(config: ScraperConfig,

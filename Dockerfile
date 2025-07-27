@@ -97,7 +97,11 @@ ENV ENVIRONMENT=production \
     HEADLESS_BROWSER=true \
     HEALTH_CHECK_ENABLED=true \
     DATABASE_PATH=/data/real_estate.duckdb \
-    LOG_LEVEL=INFO
+    LOG_LEVEL=INFO \
+    MULTI_CITY_ENABLED=true \
+    CITY_COORDINATION_ENABLED=true \
+    BACKUP_ENABLED=true \
+    DISASTER_RECOVERY_ENABLED=true
 
 # Default command
 CMD ["uv", "run", "python", "-m", "oikotie.automation.cli", "run", "--daily"]

@@ -1,8 +1,3 @@
 """
-CLI module for Oikotie visualization package.
-Provides command-line interface for visualization generation.
+CLI package for Oikotie visualization tools
 """
-
-from .commands import main, create_parser
-
-__all__ = ['main', 'create_parser']
